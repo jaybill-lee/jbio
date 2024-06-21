@@ -95,6 +95,8 @@ public class NioEventLoop implements EventLoop, Runnable {
                 }
             } catch (IOException e) {
                 e.printStackTrace();
+            } catch (Throwable e) {
+                e.printStackTrace();
             }
         }
     }
