@@ -55,6 +55,8 @@ public class NioSocketChannel extends AbstractNioChannel implements NioChannel  
             lifecycle.write();
             lifecycle.read();
         } catch (CancelledKeyException e) {
+            // Because all 3 methods above may close the channel due to IOException.
+            // Therefore, it is necessary to capture the CancelledKeyException here.
             ChannelUtil.forceClose(socketChannel);
         }
     }
