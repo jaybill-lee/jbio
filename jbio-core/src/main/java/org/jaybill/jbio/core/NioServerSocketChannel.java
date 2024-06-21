@@ -59,7 +59,12 @@ public class NioServerSocketChannel extends AbstractNioChannel implements NioCha
 
     @Override
     void handleIOEvent() {
-        lifecycle.accept();
+        if (!selectionKey.isValid()) {
+            return;
+        }
+        if ((selectionKey.readyOps() & SelectionKey.OP_ACCEPT) != 0) {
+            lifecycle.accept();
+        }
     }
 
     @Override
@@ -70,6 +75,7 @@ public class NioServerSocketChannel extends AbstractNioChannel implements NioCha
             }
             return stateFuture;
         }
+        this.eventLoop = eventLoop;
         stateFuture = eventLoop.submit(() -> {
             lifecycle.init();
             pipeline.fireChannelInitialized();
@@ -87,7 +93,6 @@ public class NioServerSocketChannel extends AbstractNioChannel implements NioCha
                 state.compareAndSet(ACTIVING, ACTIVE);
             }
         });
-        this.eventLoop = eventLoop;
         return stateFuture;
     }
 

@@ -3,6 +3,7 @@ package org.jaybill.jbio.core;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.StandardSocketOptions;
+import java.nio.channels.CancelledKeyException;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
@@ -49,9 +50,13 @@ public class NioSocketChannel extends AbstractNioChannel implements NioChannel  
         if (!selectionKey.isValid()) {
             return;
         }
-        lifecycle.connect();
-        lifecycle.read();
-        lifecycle.write();
+        try {
+            lifecycle.connect();
+            lifecycle.write();
+            lifecycle.read();
+        } catch (CancelledKeyException e) {
+            ChannelUtil.forceClose(socketChannel);
+        }
     }
 
     @Override
@@ -62,6 +67,7 @@ public class NioSocketChannel extends AbstractNioChannel implements NioChannel  
             }
             return stateFuture;
         }
+        this.eventLoop = eventLoop;
         stateFuture = eventLoop.submit(() -> {
             lifecycle.init();
             pipeline.fireChannelInitialized();
@@ -80,7 +86,6 @@ public class NioSocketChannel extends AbstractNioChannel implements NioChannel  
                 state.compareAndSet(ACTIVING, ACTIVE);
             }
         });
-        this.eventLoop = eventLoop;
         return stateFuture;
     }
 
@@ -204,6 +209,7 @@ public class NioSocketChannel extends AbstractNioChannel implements NioChannel  
                     socketChannel.finishConnect();
                 } catch (IOException e) {
                     pipeline.fireChannelException(e);
+                    ChannelUtil.forceClose(socketChannel);
                 }
             }
         }
@@ -232,7 +238,7 @@ public class NioSocketChannel extends AbstractNioChannel implements NioChannel  
                 } catch (IOException e) {
                     try {
                         socketChannel.setOption(StandardSocketOptions.SO_LINGER, 0);
-                        socketChannel.close();
+                        ChannelUtil.forceClose(socketChannel);
                         closeNotification();
                     } catch (IOException ex) {
                         // log
