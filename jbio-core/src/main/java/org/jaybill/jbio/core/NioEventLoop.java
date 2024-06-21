@@ -57,7 +57,7 @@ public class NioEventLoop implements EventLoop, Runnable {
         if (this.inEventLoop()) {
             wrapperRunnable.run();
         } else {
-            if (started.compareAndExchange(false, true)) {
+            if (!started.compareAndExchange(false, true)) {
                 this.thread.start();
             }
             boolean added = taskQueue.offer(wrapperRunnable);

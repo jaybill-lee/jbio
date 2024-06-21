@@ -145,7 +145,9 @@ public class NioSocketChannel extends AbstractNioChannel implements NioChannel  
             }
 
             // pipeline
-            initializer.initChannel(NioSocketChannel.this);
+            if (initializer != null) {
+                initializer.initChannel(NioSocketChannel.this);
+            }
         }
 
         @Override

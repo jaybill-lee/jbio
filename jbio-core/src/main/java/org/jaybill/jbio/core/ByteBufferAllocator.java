@@ -4,5 +4,5 @@ import java.nio.ByteBuffer;
 
 public interface ByteBufferAllocator {
 
-    ByteBuffer allocate();
+    ByteBuffer allocate(int capacity);
 }

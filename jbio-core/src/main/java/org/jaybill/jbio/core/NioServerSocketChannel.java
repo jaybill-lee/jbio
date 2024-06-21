@@ -150,7 +150,9 @@ public class NioServerSocketChannel extends AbstractNioChannel implements NioCha
             }
 
             // initialize the pipeline
-            bossInitializer.initChannel(NioServerSocketChannel.this);
+            if (bossInitializer != null) {
+                bossInitializer.initChannel(NioServerSocketChannel.this);
+            }
             pipeline.addLast(new Acceptor());
         }
 
