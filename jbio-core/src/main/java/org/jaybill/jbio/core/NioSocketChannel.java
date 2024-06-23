@@ -9,6 +9,7 @@ import java.nio.channels.CancelledKeyException;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
+import java.util.Collections;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -102,13 +103,23 @@ public class NioSocketChannel extends AbstractNioChannel implements NioChannel  
     }
 
     @Override
-    public NioSocketChannelConfig config() {
-        return workerConfig;
+    public ByteBufferAllocator allocator() {
+        return workerConfig.getAllocator();
+    }
+
+    @Override
+    public ReadBehavior readBehavior() {
+        return workerConfig.getReadBehavior();
+    }
+
+    @Override
+    public WriteBehavior writeBehavior() {
+        return workerConfig.getWriteBehavior();
     }
 
     @Override
     public Map<SocketOption<?>, Object> options() {
-        return workerConfig.getOptions();
+        return Collections.unmodifiableMap(workerConfig.getOptions());
     }
 
     @Override
@@ -120,6 +131,7 @@ public class NioSocketChannel extends AbstractNioChannel implements NioChannel  
     public <T> boolean option(SocketOption<T> option, T v) {
         try {
             lifecycle.setOption(option, v);
+            workerConfig.getOptions().put(option, v);
             return true;
         } catch (Exception e) {
             log.warn("set option error: ", e);

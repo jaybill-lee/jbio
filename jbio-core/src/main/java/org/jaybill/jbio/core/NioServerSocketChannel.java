@@ -9,6 +9,7 @@ import java.net.StandardSocketOptions;
 import java.nio.ByteBuffer;
 import java.nio.channels.*;
 import java.nio.channels.spi.SelectorProvider;
+import java.util.Collections;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -105,13 +106,23 @@ public class NioServerSocketChannel extends AbstractNioChannel implements NioCha
     }
 
     @Override
-    public NioChannelConfig config() {
-        return bossConfig;
+    public ByteBufferAllocator allocator() {
+       throw new IllegalStateException("not support");
+    }
+
+    @Override
+    public ReadBehavior readBehavior() {
+        throw new IllegalStateException("not support");
+    }
+
+    @Override
+    public WriteBehavior writeBehavior() {
+        throw new IllegalStateException("not support");
     }
 
     @Override
     public Map<SocketOption<?>, Object> options() {
-        return bossConfig.getOptions();
+        return Collections.unmodifiableMap(bossConfig.getOptions());
     }
 
     @Override

@@ -5,10 +5,20 @@ import java.util.concurrent.CompletableFuture;
 
 public interface NioChannel {
 
-    NioChannelConfig config();
+    ByteBufferAllocator allocator();
 
+    ReadBehavior readBehavior();
+
+    WriteBehavior writeBehavior();
+
+    /**
+     * Return an unmodifiable map, please note modify it.
+     */
     Map<SocketOption<?>, Object> options();
 
+    /**
+     * get option value
+     */
     <T> T option(SocketOption<T> option);
 
     /**
