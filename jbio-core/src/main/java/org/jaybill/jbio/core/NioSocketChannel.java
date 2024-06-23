@@ -3,6 +3,7 @@ package org.jaybill.jbio.core;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.StandardSocketOptions;
+import java.nio.ByteBuffer;
 import java.nio.channels.CancelledKeyException;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SelectionKey;
@@ -12,19 +13,20 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class NioSocketChannel extends AbstractNioChannel implements NioChannel  {
+    public static final int CONNECT_MODE = 0;
+    public static final int ACCEPT_MODE = 1;
+
     private final ChannelLifecycle lifecycle;
     private final SocketChannel socketChannel;
-    private NioEventLoop eventLoop;
-    private SelectionKey selectionKey;
-    private ChannelPipeline pipeline;
-    private NioChannelConfig workerConfig;
-    private NioChannelInitializer initializer;
-
+    private final NioChannelConfig workerConfig;
+    private final NioChannelInitializer initializer;
     private final String host;
     private final Integer port;
     private final int mode;
-    public static final int CONNECT_MODE = 0;
-    public static final int ACCEPT_MODE = 1;
+
+    private NioEventLoop eventLoop;
+    private SelectionKey selectionKey;
+    private ChannelPipeline pipeline;
 
     private volatile CompletableFuture<NioSocketChannel> stateFuture;
     private final AtomicInteger state = new AtomicInteger(INIT);
@@ -36,7 +38,6 @@ public class NioSocketChannel extends AbstractNioChannel implements NioChannel  
     public NioSocketChannel(SocketChannel socketChannel, NioChannelConfig workerConfig, NioChannelInitializer initializer, String host, Integer port, int mode) {
         super();
         this.lifecycle = new ChannelLifecycle();
-        this.pipeline = new DefaultChannelPipeline();
         this.socketChannel = socketChannel;
         this.workerConfig = workerConfig;
         this.initializer = initializer;
@@ -46,7 +47,7 @@ public class NioSocketChannel extends AbstractNioChannel implements NioChannel  
     }
 
     @Override
-    void handleIOEvent() {
+    void ioEvent() {
         if (!selectionKey.isValid()) {
             return;
         }
@@ -62,6 +63,11 @@ public class NioSocketChannel extends AbstractNioChannel implements NioChannel  
     }
 
     @Override
+    void userEvent(UserEvent event) {
+
+    }
+
+    @Override
     public CompletableFuture<NioSocketChannel> open(NioEventLoop eventLoop) {
         if (!state.compareAndSet(INIT, ACTIVING)) {
             while (stateFuture == null) {
@@ -70,7 +76,8 @@ public class NioSocketChannel extends AbstractNioChannel implements NioChannel  
             return stateFuture;
         }
         this.eventLoop = eventLoop;
-        stateFuture = eventLoop.submit(() -> {
+        this.pipeline = new DefaultChannelPipeline(new HeadHandler(), new TailHandler(), eventLoop);
+        stateFuture = eventLoop.submitTask(() -> {
             lifecycle.init();
             pipeline.fireChannelInitialized();
             lifecycle.bind();
@@ -102,18 +109,8 @@ public class NioSocketChannel extends AbstractNioChannel implements NioChannel  
     }
 
     @Override
-    public CompletableFuture<Void> deregister() {
-        return null;
-    }
-
-    @Override
-    public CompletableFuture<Void> close() {
-        return null;
-    }
-
-    @Override
-    public CompletableFuture<Void> reset() {
-        return null;
+    public ChannelPipeline pipeline() {
+        return pipeline;
     }
 
     private final class ChannelLifecycle implements SocketLifecycle {
@@ -262,6 +259,132 @@ public class NioSocketChannel extends AbstractNioChannel implements NioChannel  
             deregister();
             pipeline.fireChannelInactive();
             pipeline.fireChannelDeregistered();
+        }
+    }
+
+    private class HeadHandler implements ChannelDuplexHandler {
+
+        @Override
+        public void channelInitialized(ChannelHandlerContext ctx) {
+            System.out.println("Head channelInitialized");
+            ctx.fireChannelInitialized();
+        }
+
+        @Override
+        public void channelBound(ChannelHandlerContext ctx) {
+            System.out.println("Head channelBound");
+            ctx.fireChannelBound();
+        }
+
+        @Override
+        public void channelRegistered(ChannelHandlerContext ctx) {
+            System.out.println("Head channelRegistered");
+            ctx.fireChannelRegistered();
+        }
+
+        @Override
+        public void channelActive(ChannelHandlerContext ctx) {
+            System.out.println("Head channelActive");
+            ctx.fireChannelActive();
+        }
+
+        @Override
+        public void channelDeregistered(ChannelHandlerContext ctx) {
+
+        }
+
+        @Override
+        public void channelInactive(ChannelHandlerContext ctx) {
+
+        }
+
+        @Override
+        public void channelClosed(ChannelHandlerContext ctx) {
+
+        }
+
+        @Override
+        public void channelRead(ChannelHandlerContext ctx, Object o) {
+            System.out.println("Head channelRead");
+            ctx.fireChannelRead(null);
+        }
+
+        @Override
+        public CompletableFuture<Void> write(ChannelHandlerContext ctx, ByteBuffer buf) {
+            return null;
+        }
+
+        @Override
+        public CompletableFuture<Void> flush() {
+            return null;
+        }
+
+        @Override
+        public CompletableFuture<Void> writeAndFlush(ChannelHandlerContext ctx, ByteBuffer buf) {
+            return null;
+        }
+    }
+
+    private class TailHandler implements ChannelDuplexHandler {
+
+        @Override
+        public void channelInitialized(ChannelHandlerContext ctx) {
+            System.out.println("Tail channelInitialized");
+            ctx.fireChannelInitialized();
+        }
+
+        @Override
+        public void channelBound(ChannelHandlerContext ctx) {
+            System.out.println("Tail channelBound");
+            ctx.fireChannelBound();
+        }
+
+        @Override
+        public void channelRegistered(ChannelHandlerContext ctx) {
+            System.out.println("Tail channelRegistered");
+            ctx.fireChannelRegistered();
+        }
+
+        @Override
+        public void channelActive(ChannelHandlerContext ctx) {
+            System.out.println("Tail channelActive");
+            ctx.fireChannelActive();
+        }
+
+        @Override
+        public void channelDeregistered(ChannelHandlerContext ctx) {
+
+        }
+
+        @Override
+        public void channelInactive(ChannelHandlerContext ctx) {
+
+        }
+
+        @Override
+        public void channelClosed(ChannelHandlerContext ctx) {
+
+        }
+
+        @Override
+        public void channelRead(ChannelHandlerContext ctx, Object o) {
+            System.out.println("Tail channelRead");
+            ctx.fireChannelRead(null);
+        }
+
+        @Override
+        public CompletableFuture<Void> write(ChannelHandlerContext ctx, ByteBuffer buf) {
+            return null;
+        }
+
+        @Override
+        public CompletableFuture<Void> flush() {
+            return null;
+        }
+
+        @Override
+        public CompletableFuture<Void> writeAndFlush(ChannelHandlerContext ctx, ByteBuffer buf) {
+            return null;
         }
     }
 }

@@ -1,4 +1,6 @@
 package org.jaybill.jbio.core;
 
-public interface ChannelHandlerContext {
+public interface ChannelHandlerContext extends ChannelHandlerInvoker {
+
+    ChannelHandler handler();
 }

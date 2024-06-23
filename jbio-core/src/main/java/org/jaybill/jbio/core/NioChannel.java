@@ -9,11 +9,7 @@ public interface NioChannel {
 
     StandardSocketOptions options();
 
+    ChannelPipeline pipeline();
+
     CompletableFuture<? extends NioChannel> open(NioEventLoop eventLoop);
-
-    CompletableFuture<Void> deregister();
-
-    CompletableFuture<Void> close();
-
-    CompletableFuture<Void> reset();
 }

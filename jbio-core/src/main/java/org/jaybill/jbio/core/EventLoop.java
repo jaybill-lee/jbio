@@ -17,5 +17,5 @@ public interface EventLoop {
      * @throws RejectTaskException if queue overflows.
      * @throws TaskExecutionException if callable throw exception
      */
-    <T> CompletableFuture<T> submit(Callable<T> c);
+    <T> CompletableFuture<T> submitTask(Callable<T> c);
 }

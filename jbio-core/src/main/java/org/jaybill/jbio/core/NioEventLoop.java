@@ -43,7 +43,7 @@ public class NioEventLoop implements EventLoop, Runnable {
     }
 
     @Override
-    public <T> CompletableFuture<T> submit(Callable<T> c) {
+    public <T> CompletableFuture<T> submitTask(Callable<T> c) {
         var future = new CompletableFuture<T>();
         Runnable wrapperRunnable = () -> {
             try {
@@ -82,10 +82,8 @@ public class NioEventLoop implements EventLoop, Runnable {
                         var key = it.next();
                         it.remove();
                         var attr = key.attachment();
-                        if (attr instanceof NioSocketChannel ch) {
-                            ch.handleIOEvent();
-                        } else if (attr instanceof NioServerSocketChannel ch) {
-                            ch.handleIOEvent();
+                        if (attr instanceof AbstractNioChannel ch) {
+                            ch.ioEvent();
                         }
                     }
                 }
