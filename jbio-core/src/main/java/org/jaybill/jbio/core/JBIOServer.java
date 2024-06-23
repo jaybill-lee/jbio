@@ -4,10 +4,9 @@ import java.nio.channels.spi.SelectorProvider;
 import java.util.concurrent.CompletableFuture;
 
 public class JBIOServer {
-    private static final JBIOServer INSTANCE = new JBIOServer();
     private final SelectorProvider provider = SelectorProvider.provider();
-    private NioChannelConfig bossConfig;
-    private NioChannelConfig workerConfig;
+    private NioChannelConfigTemplate bossConfigTemplate;
+    private NioSocketChannelConfigTemplate workerConfigTemplate;
     private NioChannelInitializer bossInitializer;
     private NioChannelInitializer workerInitializer;
     private NioEventLoopGroup bossGroup;
@@ -17,13 +16,14 @@ public class JBIOServer {
 
     private JBIOServer() {}
 
-    public static JBIOServer getInstance() {
-        return INSTANCE;
+    public static JBIOServer newInstance() {
+        return new JBIOServer();
     }
 
-    public JBIOServer config(NioChannelConfig bossConfig, NioChannelConfig workerConfig) {
-        this.bossConfig = bossConfig;
-        this.workerConfig = workerConfig;
+    public JBIOServer config(NioChannelConfigTemplate bossConfigTemplate,
+                             NioSocketChannelConfigTemplate workerConfigTemplate) {
+        this.bossConfigTemplate = bossConfigTemplate;
+        this.workerConfigTemplate = workerConfigTemplate;
         return this;
     }
 
@@ -47,7 +47,7 @@ public class JBIOServer {
     }
 
     public CompletableFuture<NioServerSocketChannel> start(String host, int port, Integer backlog) {
-        var serverSocketChannel = new NioServerSocketChannel(provider, bossConfig, workerConfig,
+        var serverSocketChannel = new NioServerSocketChannel(provider, bossConfigTemplate, workerConfigTemplate,
                 bossInitializer, workerInitializer, workerGroup, host, port, backlog);
         return serverSocketChannel.open(bossGroup.next());
     }

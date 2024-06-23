@@ -1,5 +1,6 @@
 package org.jaybill.jbio.core;
 
+import lombok.extern.slf4j.Slf4j;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.StandardSocketOptions;
@@ -12,13 +13,14 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 
+@Slf4j
 public class NioSocketChannel extends AbstractNioChannel implements NioChannel  {
     public static final int CONNECT_MODE = 0;
     public static final int ACCEPT_MODE = 1;
 
     private final ChannelLifecycle lifecycle;
     private final SocketChannel socketChannel;
-    private final NioChannelConfig workerConfig;
+    private final NioSocketChannelConfig workerConfig;
     private final NioChannelInitializer initializer;
     private final String host;
     private final Integer port;
@@ -35,7 +37,8 @@ public class NioSocketChannel extends AbstractNioChannel implements NioChannel  
     private static final int ACTIVE = 2;
     private static final int INACTIVE = -1;
 
-    public NioSocketChannel(SocketChannel socketChannel, NioChannelConfig workerConfig, NioChannelInitializer initializer, String host, Integer port, int mode) {
+    public NioSocketChannel(SocketChannel socketChannel, NioSocketChannelConfig workerConfig,
+                NioChannelInitializer initializer, String host, Integer port, int mode) {
         super();
         this.lifecycle = new ChannelLifecycle();
         this.socketChannel = socketChannel;
@@ -99,13 +102,29 @@ public class NioSocketChannel extends AbstractNioChannel implements NioChannel  
     }
 
     @Override
-    public NioChannelConfig config() {
-        return null;
+    public NioSocketChannelConfig config() {
+        return workerConfig;
     }
 
     @Override
-    public StandardSocketOptions options() {
-        return null;
+    public Map<SocketOption<?>, Object> options() {
+        return workerConfig.getOptions();
+    }
+
+    @Override
+    public <T> T option(SocketOption<T> option) {
+        return (T) workerConfig.getOptions().get(option);
+    }
+
+    @Override
+    public <T> boolean option(SocketOption<T> option, T v) {
+        try {
+            lifecycle.setOption(option, v);
+            return true;
+        } catch (Exception e) {
+            log.warn("set option error: ", e);
+            return false;
+        }
     }
 
     @Override
@@ -129,19 +148,7 @@ public class NioSocketChannel extends AbstractNioChannel implements NioChannel  
                 for (Map.Entry<SocketOption<?>, Object> entry : workerConfig.getOptions().entrySet()) {
                     var k = entry.getKey();
                     var v = entry.getValue();
-                    if (k == SocketOption.SO_KEEPALIVE) {
-                        socketChannel.setOption(StandardSocketOptions.SO_KEEPALIVE, (boolean) v);
-                    } else if (k == SocketOption.TCP_NODELAY) {
-                        socketChannel.setOption(StandardSocketOptions.TCP_NODELAY, (boolean) v);
-                    } else if (k == SocketOption.SO_LINGER) {
-                        socketChannel.setOption(StandardSocketOptions.SO_LINGER, (int) v);
-                    } else if (k == SocketOption.SO_SNDBUF) {
-                        socketChannel.setOption(StandardSocketOptions.SO_SNDBUF, (int) v);
-                    } else if (k == SocketOption.SO_RCVBUF) {
-                        socketChannel.setOption(StandardSocketOptions.SO_RCVBUF, (int) v);
-                    } else if (k == SocketOption.SO_REUSEADDR) {
-                        socketChannel.setOption(StandardSocketOptions.SO_REUSEADDR, (boolean) v);
-                    }
+                    this.setOption(k, v);
                 }
             } catch (IOException e) {
                 ChannelUtil.forceClose(socketChannel);
@@ -259,6 +266,22 @@ public class NioSocketChannel extends AbstractNioChannel implements NioChannel  
             deregister();
             pipeline.fireChannelInactive();
             pipeline.fireChannelDeregistered();
+        }
+
+        private void setOption(SocketOption<?> k, Object v) throws IOException {
+            if (k == SocketOption.SO_KEEPALIVE) {
+                socketChannel.setOption(StandardSocketOptions.SO_KEEPALIVE, (boolean) v);
+            } else if (k == SocketOption.TCP_NODELAY) {
+                socketChannel.setOption(StandardSocketOptions.TCP_NODELAY, (boolean) v);
+            } else if (k == SocketOption.SO_LINGER) {
+                socketChannel.setOption(StandardSocketOptions.SO_LINGER, (int) v);
+            } else if (k == SocketOption.SO_SNDBUF) {
+                socketChannel.setOption(StandardSocketOptions.SO_SNDBUF, (int) v);
+            } else if (k == SocketOption.SO_RCVBUF) {
+                socketChannel.setOption(StandardSocketOptions.SO_RCVBUF, (int) v);
+            } else if (k == SocketOption.SO_REUSEADDR) {
+                socketChannel.setOption(StandardSocketOptions.SO_REUSEADDR, (boolean) v);
+            }
         }
     }
 

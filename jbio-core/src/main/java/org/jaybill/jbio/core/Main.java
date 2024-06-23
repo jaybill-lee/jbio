@@ -7,8 +7,8 @@ import java.util.concurrent.CompletableFuture;
 public class Main {
 
     public static void main(String[] args) {
-        var server = JBIOServer.getInstance()
-                .config(NioChannelConfig.DEFAULT, NioChannelConfig.DEFAULT)
+        var server = JBIOServer.newInstance()
+                .config(NioChannelConfigTemplate.DEFAULT, NioSocketChannelConfigTemplate.DEFAULT)
                 .initializer(null, channel -> {
                     channel.pipeline().addLast(new ChannelDuplexHandler() {
                         @Override

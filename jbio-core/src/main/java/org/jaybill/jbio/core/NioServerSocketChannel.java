@@ -1,5 +1,6 @@
 package org.jaybill.jbio.core;
 
+import lombok.extern.slf4j.Slf4j;
 import org.jaybill.jbio.core.ex.AcceptSocketChannelException;
 
 import java.io.IOException;
@@ -12,12 +13,13 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 
+@Slf4j
 public class NioServerSocketChannel extends AbstractNioChannel implements NioChannel {
     private final ChannelLifecycle lifecycle;
     private ChannelPipeline pipeline;
     private final SelectorProvider provider;
-    private final NioChannelConfig serverSocketChannelConfig;
-    private final NioChannelConfig socketChannelConfig;
+    private final NioChannelConfig bossConfig;
+    private final NioSocketChannelConfigTemplate workerConfigTemplate;
     private final NioChannelInitializer bossInitializer;
     private final NioChannelInitializer workerInitializer;
     private final String host;
@@ -38,8 +40,8 @@ public class NioServerSocketChannel extends AbstractNioChannel implements NioCha
 
     NioServerSocketChannel(
             SelectorProvider provider,
-            NioChannelConfig serverSocketChannelConfig,
-            NioChannelConfig socketChannelConfig,
+            NioChannelConfigTemplate bossConfigTemplate,
+            NioSocketChannelConfigTemplate workerConfigTemplate,
             NioChannelInitializer bossInitializer,
             NioChannelInitializer workerInitializer,
             NioEventLoopGroup workerGroup,
@@ -47,8 +49,8 @@ public class NioServerSocketChannel extends AbstractNioChannel implements NioCha
         super();
         this.lifecycle = new ChannelLifecycle();
         this.provider = provider;
-        this.serverSocketChannelConfig = serverSocketChannelConfig;
-        this.socketChannelConfig = socketChannelConfig;
+        this.bossConfig = bossConfigTemplate.create();
+        this.workerConfigTemplate = workerConfigTemplate;
         this.bossInitializer = bossInitializer;
         this.workerInitializer = workerInitializer;
         this.workerGroup = workerGroup;
@@ -104,12 +106,29 @@ public class NioServerSocketChannel extends AbstractNioChannel implements NioCha
 
     @Override
     public NioChannelConfig config() {
-        return null;
+        return bossConfig;
     }
 
     @Override
-    public StandardSocketOptions options() {
-        return null;
+    public Map<SocketOption<?>, Object> options() {
+        return bossConfig.getOptions();
+    }
+
+    @Override
+    public <T> T option(SocketOption<T> option) {
+        return (T) bossConfig.getOptions().get(option);
+    }
+
+    @Override
+    public <T> boolean option(SocketOption<T> option, T v) {
+        try {
+            lifecycle.setOption(option, v);
+            bossConfig.getOptions().put(option, v);
+            return true;
+        } catch (Exception e) {
+            log.warn("set option error:", e);
+            return false;
+        }
     }
 
     @Override
@@ -137,13 +156,10 @@ public class NioServerSocketChannel extends AbstractNioChannel implements NioCha
 
             // set socket option
             try {
-                for (Map.Entry<SocketOption<?>, Object> option : serverSocketChannelConfig.getOptions().entrySet()) {
+                for (Map.Entry<SocketOption<?>, Object> option : bossConfig.getOptions().entrySet()) {
                     var k = option.getKey();
                     var v = option.getValue();
-                    if (k == SocketOption.SO_RCVBUF) {
-                        serverSocketChannel.setOption(StandardSocketOptions.SO_RCVBUF, (int) v);
-                        break;
-                    }
+                    this.setOption(k, v);
                 }
             } catch (IOException e) {
                 ChannelUtil.forceClose(serverSocketChannel);
@@ -210,8 +226,15 @@ public class NioServerSocketChannel extends AbstractNioChannel implements NioCha
                 return;
             }
 
-            var childCh = new NioSocketChannel(ch, socketChannelConfig, workerInitializer, null, null, NioSocketChannel.ACCEPT_MODE);
+            var childCh = new NioSocketChannel(ch, workerConfigTemplate.create(), workerInitializer,
+                    null, null, NioSocketChannel.ACCEPT_MODE);
             childCh.open(workerGroup.next());
+        }
+
+        private void setOption(SocketOption<?> k, Object v) throws IOException {
+            if (k == SocketOption.SO_RCVBUF) {
+                serverSocketChannel.setOption(StandardSocketOptions.SO_RCVBUF, (int) v);
+            }
         }
     }
 
