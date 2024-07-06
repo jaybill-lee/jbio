@@ -8,13 +8,15 @@ public interface ChannelHandlerInvoker {
     void fireChannelInitialized();
     void fireChannelBound();
     void fireChannelRegistered();
-    void fireChannelActive();
-    void fireChannelRead(ByteBuffer buf);
+    void fireChannelRead(Object o);
     void fireChannelClosed();
-    void fireChannelInactive();
     void fireChannelDeregistered();
     void fireChannelException(Throwable t);
+    void fireChannelUnWritable();
+    void fireChannelWritable();
 
     // outbound event
     CompletableFuture<Void> fireChannelWrite(ByteBuffer buf);
+    CompletableFuture<Void> fireChannelFlush();
+    CompletableFuture<Void> fireChannelWriteAndFlush(ByteBuffer buf);
 }

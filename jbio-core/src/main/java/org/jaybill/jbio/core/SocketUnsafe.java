@@ -1,8 +1,6 @@
 package org.jaybill.jbio.core;
 
-import java.nio.ByteBuffer;
-
-public interface SocketLifecycle extends Lifecycle {
+public interface SocketUnsafe extends Unsafe {
 
     void connect();
 

@@ -6,13 +6,20 @@ import java.util.function.BiConsumer;
 
 public class DefaultChannelHandlerContext implements ChannelHandlerContext {
     private final ChannelHandler handler;
+    private final NioChannel channel;
     private final EventLoop eventLoop;
     DefaultChannelHandlerContext next;
     DefaultChannelHandlerContext prev;
 
-    public DefaultChannelHandlerContext(ChannelHandler handler, EventLoop eventLoop) {
+    public DefaultChannelHandlerContext(ChannelHandler handler, NioChannel channel, EventLoop eventLoop) {
         this.handler = handler;
+        this.channel = channel;
         this.eventLoop = eventLoop;
+    }
+
+    @Override
+    public NioChannel channel() {
+        return channel;
     }
 
     @Override
@@ -36,23 +43,13 @@ public class DefaultChannelHandlerContext implements ChannelHandlerContext {
     }
 
     @Override
-    public void fireChannelActive() {
-        this.doInvokeInbound(ChannelInboundHandler::channelActive);
-    }
-
-    @Override
-    public void fireChannelRead(ByteBuffer buf) {
-        this.doInvokeInbound((handler, cur) -> handler.channelRead(cur, buf));
+    public void fireChannelRead(Object o) {
+        this.doInvokeInbound((handler, cur) -> handler.channelRead(cur, o));
     }
 
     @Override
     public void fireChannelClosed() {
         this.doInvokeInbound(ChannelInboundHandler::channelClosed);
-    }
-
-    @Override
-    public void fireChannelInactive() {
-        this.doInvokeInbound(ChannelInboundHandler::channelInactive);
     }
 
     @Override
@@ -62,11 +59,31 @@ public class DefaultChannelHandlerContext implements ChannelHandlerContext {
 
     @Override
     public void fireChannelException(Throwable t) {
+        this.doInvokeInbound((handler, ctx) -> handler.channelException(ctx, t));
+    }
 
+    @Override
+    public void fireChannelUnWritable() {
+        this.doInvokeInbound(ChannelInboundHandler::channelUnWritable);
+    }
+
+    @Override
+    public void fireChannelWritable() {
+        this.doInvokeInbound(ChannelInboundHandler::channelWritable);
     }
 
     @Override
     public CompletableFuture<Void> fireChannelWrite(ByteBuffer buf) {
+        return null;
+    }
+
+    @Override
+    public CompletableFuture<Void> fireChannelFlush() {
+        return null;
+    }
+
+    @Override
+    public CompletableFuture<Void> fireChannelWriteAndFlush(ByteBuffer buf) {
         return null;
     }
 

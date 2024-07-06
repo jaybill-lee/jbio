@@ -6,7 +6,6 @@ import org.jaybill.jbio.core.ex.AcceptSocketChannelException;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.StandardSocketOptions;
-import java.nio.ByteBuffer;
 import java.nio.channels.*;
 import java.nio.channels.spi.SelectorProvider;
 import java.util.Collections;
@@ -16,8 +15,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 @Slf4j
 public class NioServerSocketChannel extends AbstractNioChannel implements NioChannel {
-    private final ChannelLifecycle lifecycle;
-    private ChannelPipeline pipeline;
+    private final ChannelUnsafe unsafe;
     private final SelectorProvider provider;
     private final NioChannelConfig bossConfig;
     private final NioSocketChannelConfigTemplate workerConfigTemplate;
@@ -29,6 +27,7 @@ public class NioServerSocketChannel extends AbstractNioChannel implements NioCha
     private final NioEventLoopGroup workerGroup;
 
     private NioEventLoop eventLoop;
+    private ChannelPipeline pipeline;
     private ServerSocketChannel serverSocketChannel;
     private SelectionKey selectionKey;
 
@@ -48,7 +47,7 @@ public class NioServerSocketChannel extends AbstractNioChannel implements NioCha
             NioEventLoopGroup workerGroup,
             String host, int port, Integer backlog) {
         super();
-        this.lifecycle = new ChannelLifecycle();
+        this.unsafe = new ChannelUnsafe();
         this.provider = provider;
         this.bossConfig = bossConfigTemplate.create();
         this.workerConfigTemplate = workerConfigTemplate;
@@ -66,7 +65,7 @@ public class NioServerSocketChannel extends AbstractNioChannel implements NioCha
             return;
         }
         if ((selectionKey.readyOps() & SelectionKey.OP_ACCEPT) != 0) {
-            lifecycle.accept();
+            unsafe.accept();
         }
     }
 
@@ -84,16 +83,11 @@ public class NioServerSocketChannel extends AbstractNioChannel implements NioCha
             return stateFuture;
         }
         this.eventLoop = eventLoop;
-        this.pipeline = new DefaultChannelPipeline(new HeadHandler(), new TailHandler(), eventLoop);
+        this.pipeline = new DefaultChannelPipeline(new HeadHandler(), new TailHandler(), this, eventLoop);
         stateFuture = eventLoop.submitTask(() -> {
-            lifecycle.init();
-            pipeline.fireChannelInitialized();
-            lifecycle.bind();
-            pipeline.fireChannelBound();
-            lifecycle.register();
-            pipeline.fireChannelRegistered();
-            lifecycle.active();
-            pipeline.fireChannelActive();
+            unsafe.init();
+            unsafe.bind();
+            unsafe.register();
             return this;
         }).whenComplete((r, t) -> {
             if (t != null) {
@@ -133,7 +127,7 @@ public class NioServerSocketChannel extends AbstractNioChannel implements NioCha
     @Override
     public <T> boolean option(SocketOption<T> option, T v) {
         try {
-            lifecycle.setOption(option, v);
+            unsafe.setOption(option, v);
             bossConfig.getOptions().put(option, v);
             return true;
         } catch (Exception e) {
@@ -147,7 +141,7 @@ public class NioServerSocketChannel extends AbstractNioChannel implements NioCha
         return pipeline;
     }
 
-    private class ChannelLifecycle implements ServerSocketLifecycle {
+    private class ChannelUnsafe implements ServerSocketUnsafe {
         @Override
         public void init() {
             // open
@@ -181,6 +175,8 @@ public class NioServerSocketChannel extends AbstractNioChannel implements NioCha
             if (bossInitializer != null) {
                 bossInitializer.initChannel(NioServerSocketChannel.this);
             }
+
+            pipeline.fireChannelInitialized();
         }
 
         @Override
@@ -191,6 +187,7 @@ public class NioServerSocketChannel extends AbstractNioChannel implements NioCha
                 } else {
                     serverSocketChannel.bind(new InetSocketAddress(host, port), backlog);
                 }
+                pipeline.fireChannelBound();
             } catch (IOException e) {
                 ChannelUtil.forceClose(serverSocketChannel);
                 throw new JBIOException("bind socket error", e);
@@ -200,7 +197,9 @@ public class NioServerSocketChannel extends AbstractNioChannel implements NioCha
         @Override
         public void register() {
             try {
-                selectionKey = serverSocketChannel.register(eventLoop.selector(), 0, NioServerSocketChannel.this);
+                selectionKey = serverSocketChannel.register(eventLoop.selector(),
+                        SelectionKey.OP_ACCEPT, NioServerSocketChannel.this);
+                pipeline.fireChannelRegistered();
             } catch (ClosedChannelException e) {
                 ChannelUtil.forceClose(serverSocketChannel);
                 throw new JBIOException("ServerSocketChannel register error", e);
@@ -208,23 +207,16 @@ public class NioServerSocketChannel extends AbstractNioChannel implements NioCha
         }
 
         @Override
-        public void active() {
-            selectionKey.interestOps(SelectionKey.OP_ACCEPT);
-        }
-
-        @Override
         public void close() {
-
-        }
-
-        @Override
-        public void inactive() {
-
+            ChannelUtil.forceClose(serverSocketChannel);
+            pipeline.fireChannelDeregistered();
+            pipeline.fireChannelClosed();
         }
 
         @Override
         public void deregister() {
-
+            selectionKey.cancel();
+            pipeline.fireChannelDeregistered();
         }
 
         @Override
@@ -249,119 +241,6 @@ public class NioServerSocketChannel extends AbstractNioChannel implements NioCha
         }
     }
 
-    private class HeadHandler implements ChannelDuplexHandler {
-
-        @Override
-        public void channelInitialized(ChannelHandlerContext ctx) {
-
-        }
-
-        @Override
-        public void channelBound(ChannelHandlerContext ctx) {
-
-        }
-
-        @Override
-        public void channelRegistered(ChannelHandlerContext ctx) {
-
-        }
-
-        @Override
-        public void channelActive(ChannelHandlerContext ctx) {
-
-        }
-
-        @Override
-        public void channelDeregistered(ChannelHandlerContext ctx) {
-
-        }
-
-        @Override
-        public void channelInactive(ChannelHandlerContext ctx) {
-
-        }
-
-        @Override
-        public void channelClosed(ChannelHandlerContext ctx) {
-
-        }
-
-        @Override
-        public void channelRead(ChannelHandlerContext ctx, Object o) {
-
-        }
-
-        @Override
-        public CompletableFuture<Void> write(ChannelHandlerContext ctx, ByteBuffer buf) {
-            return null;
-        }
-
-        @Override
-        public CompletableFuture<Void> flush() {
-            return null;
-        }
-
-        @Override
-        public CompletableFuture<Void> writeAndFlush(ChannelHandlerContext ctx, ByteBuffer buf) {
-            return null;
-        }
-    }
-
-    private class TailHandler implements ChannelDuplexHandler {
-
-        @Override
-        public void channelInitialized(ChannelHandlerContext ctx) {
-
-        }
-
-        @Override
-        public void channelBound(ChannelHandlerContext ctx) {
-
-        }
-
-        @Override
-        public void channelRegistered(ChannelHandlerContext ctx) {
-
-        }
-
-        @Override
-        public void channelActive(ChannelHandlerContext ctx) {
-
-        }
-
-        @Override
-        public void channelDeregistered(ChannelHandlerContext ctx) {
-
-        }
-
-        @Override
-        public void channelInactive(ChannelHandlerContext ctx) {
-
-        }
-
-        @Override
-        public void channelClosed(ChannelHandlerContext ctx) {
-
-        }
-
-        @Override
-        public void channelRead(ChannelHandlerContext ctx, Object o) {
-
-        }
-
-        @Override
-        public CompletableFuture<Void> write(ChannelHandlerContext ctx, ByteBuffer buf) {
-            return null;
-        }
-
-        @Override
-        public CompletableFuture<Void> flush() {
-            return null;
-        }
-
-        @Override
-        public CompletableFuture<Void> writeAndFlush(ChannelHandlerContext ctx, ByteBuffer buf) {
-            return null;
-        }
-    }
+    private class HeadHandler extends DefaultChannelDuplexHandler {}
+    private class TailHandler extends DefaultChannelDuplexHandler {}
 }

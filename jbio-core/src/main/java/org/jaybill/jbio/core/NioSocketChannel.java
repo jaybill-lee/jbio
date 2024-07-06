@@ -9,8 +9,7 @@ import java.nio.channels.CancelledKeyException;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
-import java.util.Collections;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -19,7 +18,7 @@ public class NioSocketChannel extends AbstractNioChannel implements NioChannel  
     public static final int CONNECT_MODE = 0;
     public static final int ACCEPT_MODE = 1;
 
-    private final ChannelLifecycle lifecycle;
+    private final ChannelUnsafe unsafe;
     private final SocketChannel socketChannel;
     private final NioSocketChannelConfig workerConfig;
     private final NioChannelInitializer initializer;
@@ -30,18 +29,21 @@ public class NioSocketChannel extends AbstractNioChannel implements NioChannel  
     private NioEventLoop eventLoop;
     private SelectionKey selectionKey;
     private ChannelPipeline pipeline;
+    private SendBuffer sendBuffer;
+    private boolean channelUnWritable = false;
 
     private volatile CompletableFuture<NioSocketChannel> stateFuture;
     private final AtomicInteger state = new AtomicInteger(INIT);
     private static final int INIT = 0;
     private static final int ACTIVING = 1;
     private static final int ACTIVE = 2;
+    private static final int CLOSED = -2;
     private static final int INACTIVE = -1;
 
     public NioSocketChannel(SocketChannel socketChannel, NioSocketChannelConfig workerConfig,
                 NioChannelInitializer initializer, String host, Integer port, int mode) {
         super();
-        this.lifecycle = new ChannelLifecycle();
+        this.unsafe = new ChannelUnsafe();
         this.socketChannel = socketChannel;
         this.workerConfig = workerConfig;
         this.initializer = initializer;
@@ -56,13 +58,14 @@ public class NioSocketChannel extends AbstractNioChannel implements NioChannel  
             return;
         }
         try {
-            lifecycle.connect();
-            lifecycle.write();
-            lifecycle.read();
+            unsafe.connect();
+            unsafe.write();
+            unsafe.read();
         } catch (CancelledKeyException e) {
             // Because all 3 methods above may close the channel due to IOException.
             // Therefore, it is necessary to capture the CancelledKeyException here.
-            ChannelUtil.forceClose(socketChannel);
+            // ignore
+            log.warn("channel key be cancel:", e);
         }
     }
 
@@ -80,16 +83,11 @@ public class NioSocketChannel extends AbstractNioChannel implements NioChannel  
             return stateFuture;
         }
         this.eventLoop = eventLoop;
-        this.pipeline = new DefaultChannelPipeline(new HeadHandler(), new TailHandler(), eventLoop);
+        this.pipeline = new DefaultChannelPipeline(new HeadHandler(), new TailHandler(), this, eventLoop);
         stateFuture = eventLoop.submitTask(() -> {
-            lifecycle.init();
-            pipeline.fireChannelInitialized();
-            lifecycle.bind();
-            pipeline.fireChannelBound();
-            lifecycle.register();
-            pipeline.fireChannelRegistered();
-            lifecycle.active();
-            pipeline.fireChannelActive();
+            unsafe.init();
+            unsafe.bind();
+            unsafe.register();
             return this;
         }).whenComplete((r, t) -> {
             if (t != null) {
@@ -130,7 +128,7 @@ public class NioSocketChannel extends AbstractNioChannel implements NioChannel  
     @Override
     public <T> boolean option(SocketOption<T> option, T v) {
         try {
-            lifecycle.setOption(option, v);
+            unsafe.setOption(option, v);
             workerConfig.getOptions().put(option, v);
             return true;
         } catch (Exception e) {
@@ -144,7 +142,7 @@ public class NioSocketChannel extends AbstractNioChannel implements NioChannel  
         return pipeline;
     }
 
-    private final class ChannelLifecycle implements SocketLifecycle {
+    private final class ChannelUnsafe implements SocketUnsafe {
         @Override
         public void init() {
             // set non-blocking mode
@@ -167,10 +165,15 @@ public class NioSocketChannel extends AbstractNioChannel implements NioChannel  
                 throw new JBIOException("SocketChannel set options error", e);
             }
 
+            // send buffer
+            sendBuffer = new SendBuffer();
+
             // pipeline
             if (initializer != null) {
                 initializer.initChannel(NioSocketChannel.this);
             }
+
+            pipeline.fireChannelInitialized();
         }
 
         @Override
@@ -178,6 +181,7 @@ public class NioSocketChannel extends AbstractNioChannel implements NioChannel  
             if (host != null && port != null) {
                 try {
                     socketChannel.bind(new InetSocketAddress(host, port));
+                    pipeline.fireChannelBound();
                 } catch (IOException e) {
                     ChannelUtil.forceClose(socketChannel);
                     throw new JBIOException("SocketChannel bind error", e);
@@ -189,6 +193,12 @@ public class NioSocketChannel extends AbstractNioChannel implements NioChannel  
         public void register() {
             try {
                 selectionKey = socketChannel.register(eventLoop.selector(), 0, NioSocketChannel.this);
+                if (mode == CONNECT_MODE) {
+                    selectionKey.interestOps(SelectionKey.OP_CONNECT);
+                } else if (mode == ACCEPT_MODE) {
+                    selectionKey.interestOps(SelectionKey.OP_READ);
+                }
+                pipeline.fireChannelRegistered();
             } catch (ClosedChannelException e) {
                 ChannelUtil.forceClose(socketChannel);
                 throw new JBIOException("SocketChannel register to Selector error", e);
@@ -196,27 +206,16 @@ public class NioSocketChannel extends AbstractNioChannel implements NioChannel  
         }
 
         @Override
-        public void active() {
-            if (mode == CONNECT_MODE) {
-                selectionKey.interestOps(SelectionKey.OP_CONNECT);
-            } else if (mode == ACCEPT_MODE) {
-                selectionKey.interestOps(SelectionKey.OP_READ);
-            }
-        }
-
-        @Override
         public void close() {
-
-        }
-
-        @Override
-        public void inactive() {
-
+            ChannelUtil.forceClose(socketChannel);
+            pipeline.fireChannelDeregistered();
+            pipeline.fireChannelClosed();
         }
 
         @Override
         public void deregister() {
-
+            selectionKey.cancel();
+            pipeline.fireChannelDeregistered();
         }
 
         @Override
@@ -241,26 +240,27 @@ public class NioSocketChannel extends AbstractNioChannel implements NioChannel  
                     var strategy = workerConfig.getReadBehavior().getStrategy();
                     for (int i = 0; i < maxReadCount; i++) {
                         var buf = strategy.allocate();
+                        int available = buf.limit() - buf.position();
                         int c = socketChannel.read(buf);
                         if (c == -1) {
                             socketChannel.close();
-                            closeNotification();
+                            pipeline.fireChannelDeregistered();
+                            pipeline.fireChannelClosed();
                             break;
                         } else if (c == 0) {
                             // release buf
                             break;
                         } else if (c > 0) {
                             pipeline.fireChannelRead(buf);
+                            if (c < available) {
+                                break;
+                            }
                         }
                     }
                 } catch (IOException e) {
-                    try {
-                        socketChannel.setOption(StandardSocketOptions.SO_LINGER, 0);
-                        ChannelUtil.forceClose(socketChannel);
-                        closeNotification();
-                    } catch (IOException ex) {
-                        // log
-                    }
+                    this.close();
+                } catch (Throwable e) {
+                    pipeline.fireChannelException(e);
                 }
             }
         }
@@ -271,13 +271,6 @@ public class NioSocketChannel extends AbstractNioChannel implements NioChannel  
             if ((readyOps & SelectionKey.OP_WRITE) != 0) {
 
             }
-        }
-
-        private void closeNotification() {
-            pipeline.fireChannelClosed();
-            deregister();
-            pipeline.fireChannelInactive();
-            pipeline.fireChannelDeregistered();
         }
 
         private void setOption(SocketOption<?> k, Object v) throws IOException {
@@ -297,129 +290,108 @@ public class NioSocketChannel extends AbstractNioChannel implements NioChannel  
         }
     }
 
-    private class HeadHandler implements ChannelDuplexHandler {
-
-        @Override
-        public void channelInitialized(ChannelHandlerContext ctx) {
-            System.out.println("Head channelInitialized");
-            ctx.fireChannelInitialized();
-        }
-
-        @Override
-        public void channelBound(ChannelHandlerContext ctx) {
-            System.out.println("Head channelBound");
-            ctx.fireChannelBound();
-        }
-
-        @Override
-        public void channelRegistered(ChannelHandlerContext ctx) {
-            System.out.println("Head channelRegistered");
-            ctx.fireChannelRegistered();
-        }
-
-        @Override
-        public void channelActive(ChannelHandlerContext ctx) {
-            System.out.println("Head channelActive");
-            ctx.fireChannelActive();
-        }
-
-        @Override
-        public void channelDeregistered(ChannelHandlerContext ctx) {
-
-        }
-
-        @Override
-        public void channelInactive(ChannelHandlerContext ctx) {
-
-        }
-
-        @Override
-        public void channelClosed(ChannelHandlerContext ctx) {
-
-        }
-
-        @Override
-        public void channelRead(ChannelHandlerContext ctx, Object o) {
-            System.out.println("Head channelRead");
-            ctx.fireChannelRead(null);
-        }
-
+    private final class HeadHandler extends DefaultChannelDuplexHandler {
         @Override
         public CompletableFuture<Void> write(ChannelHandlerContext ctx, ByteBuffer buf) {
-            return null;
+            sendBuffer.add(buf);
+            var writeBehavior = workerConfig.getWriteBehavior();
+            if (writeBehavior.getHighWatermark() <= sendBuffer.unsentBytes()) {
+                channelUnWritable = true;
+                pipeline.fireChannelUnWritable();
+            }
+            return CompletableFuture.completedFuture(null);
         }
 
         @Override
-        public CompletableFuture<Void> flush() {
-            return null;
+        public CompletableFuture<Void> flush(ChannelHandlerContext ctx) {
+            try {
+                var writeBehavior = workerConfig.getWriteBehavior();
+                for (int i = 0; i < writeBehavior.getMaxWritePerLoop(); i++) {
+                    var buf = sendBuffer.remove();
+                    if (buf == null) {
+                        break;
+                    }
+                    // first write
+                    socketChannel.write(buf);
+                    if (buf.remaining() != 0) {
+                        boolean flushed = false;
+                        // spin write
+                        for (int j = 0; j < writeBehavior.getSpinCount(); j++) {
+                            socketChannel.write(buf);
+                            if (buf.remaining() == 0) {
+                                flushed = true;
+                                break;
+                            }
+                        }
+                        if (!flushed) {
+                            sendBuffer.addFirst(buf);
+                            break; // don't continue to write the next ByteBuffer
+                        }
+                    }
+                }
+
+                // edge trigger channelWritable()
+                if (channelUnWritable && writeBehavior.getLowWatermark() >= sendBuffer.unsentBytes()) {
+                    channelUnWritable = false;
+                    pipeline.fireChannelWritable();
+                }
+            } catch (IOException e) {
+                unsafe.close();
+            }
+            return CompletableFuture.completedFuture(null);
         }
 
         @Override
         public CompletableFuture<Void> writeAndFlush(ChannelHandlerContext ctx, ByteBuffer buf) {
-            return null;
+            this.write(ctx, buf);
+            return this.flush(ctx);
         }
     }
 
-    private class TailHandler implements ChannelDuplexHandler {
-
-        @Override
-        public void channelInitialized(ChannelHandlerContext ctx) {
-            System.out.println("Tail channelInitialized");
-            ctx.fireChannelInitialized();
-        }
-
-        @Override
-        public void channelBound(ChannelHandlerContext ctx) {
-            System.out.println("Tail channelBound");
-            ctx.fireChannelBound();
-        }
-
-        @Override
-        public void channelRegistered(ChannelHandlerContext ctx) {
-            System.out.println("Tail channelRegistered");
-            ctx.fireChannelRegistered();
-        }
-
-        @Override
-        public void channelActive(ChannelHandlerContext ctx) {
-            System.out.println("Tail channelActive");
-            ctx.fireChannelActive();
-        }
-
-        @Override
-        public void channelDeregistered(ChannelHandlerContext ctx) {
-
-        }
-
-        @Override
-        public void channelInactive(ChannelHandlerContext ctx) {
-
-        }
-
-        @Override
-        public void channelClosed(ChannelHandlerContext ctx) {
-
-        }
+    private final class TailHandler extends DefaultChannelDuplexHandler {
 
         @Override
         public void channelRead(ChannelHandlerContext ctx, Object o) {
-            System.out.println("Tail channelRead");
-            ctx.fireChannelRead(null);
+            if (!(o instanceof ByteBuffer)) {
+                return;
+            }
+            var buffer = (ByteBuffer) o;
+            // release buffer
+        }
+    }
+
+    private final class SendBuffer {
+        private Deque<ByteBuffer> bufferQueue;
+        private volatile int unsentBytes = 0;
+
+        public SendBuffer() {
+            this.bufferQueue = new ArrayDeque<>(16);
         }
 
-        @Override
-        public CompletableFuture<Void> write(ChannelHandlerContext ctx, ByteBuffer buf) {
-            return null;
+        public void add(ByteBuffer buf) {
+            bufferQueue.offer(buf);
+            unsentBytes += buf.remaining();
         }
 
-        @Override
-        public CompletableFuture<Void> flush() {
-            return null;
+        public void addFirst(ByteBuffer buf) {
+            bufferQueue.offerFirst(buf);
+            unsentBytes += buf.remaining();
         }
 
-        @Override
-        public CompletableFuture<Void> writeAndFlush(ChannelHandlerContext ctx, ByteBuffer buf) {
-            return null;
+        public ByteBuffer remove() {
+            var buf = bufferQueue.poll();
+            if (buf != null) {
+                unsentBytes -= buf.remaining();
+            }
+            return buf;
+        }
+
+        public int size() {
+            return bufferQueue.size();
+        }
+
+        public int unsentBytes() {
+            return unsentBytes;
         }
     }
 }

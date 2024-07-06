@@ -11,18 +11,20 @@ public class DefaultChannelPipeline implements ChannelPipeline {
     private final DefaultChannelHandlerContext head;
     private final DefaultChannelHandlerContext tail;
     private final EventLoop eventLoop;
+    private final NioChannel channel;
 
-    public DefaultChannelPipeline(ChannelHandler headHandler, ChannelHandler tailHandler, EventLoop eventLoop) {
+    public DefaultChannelPipeline(ChannelHandler headHandler, ChannelHandler tailHandler, NioChannel channel, EventLoop eventLoop) {
         this.eventLoop = eventLoop;
-        head = new DefaultChannelHandlerContext(headHandler, eventLoop);
-        tail = new DefaultChannelHandlerContext(tailHandler, eventLoop);
+        this.channel = channel;
+        head = new DefaultChannelHandlerContext(headHandler, channel, eventLoop);
+        tail = new DefaultChannelHandlerContext(tailHandler, channel, eventLoop);
         head.next = tail;
         tail.prev = head;
     }
 
     @Override
     public ChannelPipeline addLast(ChannelHandler handler) {
-        var cur = new DefaultChannelHandlerContext(handler, eventLoop);
+        var cur = new DefaultChannelHandlerContext(handler, channel, eventLoop);
         try {
             lock.lock();
             var p = tail.prev;
@@ -76,13 +78,8 @@ public class DefaultChannelPipeline implements ChannelPipeline {
     }
 
     @Override
-    public void fireChannelActive() {
-        ((ChannelInboundHandler) head.handler()).channelActive(head);
-    }
-
-    @Override
-    public void fireChannelRead(ByteBuffer buf) {
-        ((ChannelInboundHandler) head.handler()).channelRead(head, buf);
+    public void fireChannelRead(Object o) {
+        ((ChannelInboundHandler) head.handler()).channelRead(head, o);
     }
 
     @Override
@@ -96,17 +93,32 @@ public class DefaultChannelPipeline implements ChannelPipeline {
     }
 
     @Override
-    public void fireChannelInactive() {
-        ((ChannelInboundHandler) head.handler()).channelInactive(head);
+    public void fireChannelException(Throwable t) {
+        ((ChannelInboundHandler) head.handler()).channelException(head, t);
     }
 
     @Override
-    public void fireChannelException(Throwable t) {
+    public void fireChannelUnWritable() {
+        ((ChannelInboundHandler) head.handler()).channelUnWritable(head);
+    }
 
+    @Override
+    public void fireChannelWritable() {
+        ((ChannelInboundHandler) head.handler()).channelWritable(head);
     }
 
     @Override
     public CompletableFuture<Void> fireChannelWrite(ByteBuffer buf) {
-        return null;
+        return ((ChannelOutboundHandler) tail).write(tail, buf);
+    }
+
+    @Override
+    public CompletableFuture<Void> fireChannelFlush() {
+        return ((ChannelOutboundHandler) tail).flush(tail);
+    }
+
+    @Override
+    public CompletableFuture<Void> fireChannelWriteAndFlush(ByteBuffer buf) {
+        return ((ChannelOutboundHandler) tail).writeAndFlush(tail, buf);
     }
 }

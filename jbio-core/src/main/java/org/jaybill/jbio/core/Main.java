@@ -29,17 +29,17 @@ public class Main {
                         }
 
                         @Override
-                        public void channelActive(ChannelHandlerContext ctx) {
-
-                        }
-
-                        @Override
                         public void channelDeregistered(ChannelHandlerContext ctx) {
 
                         }
 
                         @Override
-                        public void channelInactive(ChannelHandlerContext ctx) {
+                        public void channelUnWritable(ChannelHandlerContext ctx) {
+
+                        }
+
+                        @Override
+                        public void channelWritable(ChannelHandlerContext ctx) {
 
                         }
 
@@ -50,6 +50,11 @@ public class Main {
 
                         @Override
                         public void channelRead(ChannelHandlerContext ctx, Object o) {
+                            ctx.fireChannelWrite((ByteBuffer) o);
+                        }
+
+                        @Override
+                        public void channelException(ChannelHandlerContext ctx, Throwable t) {
 
                         }
 
@@ -59,7 +64,7 @@ public class Main {
                         }
 
                         @Override
-                        public CompletableFuture<Void> flush() {
+                        public CompletableFuture<Void> flush(ChannelHandlerContext ctx) {
                             return null;
                         }
 
