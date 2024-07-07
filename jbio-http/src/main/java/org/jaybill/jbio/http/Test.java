@@ -8,7 +8,7 @@ public class Test {
         var server = JBIOServer.newInstance()
                 .config(NioChannelConfigTemplate.DEFAULT, NioSocketChannelConfigTemplate.DEFAULT)
                 .initializer(null, channel -> {
-                    channel.pipeline().addLast(new HttpHandler());
+                    channel.pipeline().addLast(new HttpServerHandler());
                 })
                 .eventLoop(1, Runtime.getRuntime().availableProcessors());
 

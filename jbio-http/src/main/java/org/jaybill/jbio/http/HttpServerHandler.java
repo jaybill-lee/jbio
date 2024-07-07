@@ -6,12 +6,12 @@ import org.jaybill.jbio.core.DefaultChannelDuplexHandler;
 import java.nio.ByteBuffer;
 import java.util.concurrent.CompletableFuture;
 
-public class HttpHandler extends DefaultChannelDuplexHandler {
+public class HttpServerHandler extends DefaultChannelDuplexHandler {
 
-    private HttpDecoder decoder;
+    private HttpServerCodec codec;
 
-    public HttpHandler() {
-        this.decoder = new HttpDecoder();
+    public HttpServerHandler() {
+        this.codec = new HttpServerCodec();
     }
 
     @Override
@@ -32,7 +32,7 @@ public class HttpHandler extends DefaultChannelDuplexHandler {
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object o) {
         var buf = (ByteBuffer) o;
-        decoder.decode(buf, System.out::println);
+        codec.decode(buf, System.out::println);
     }
 
     @Override

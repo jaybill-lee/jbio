@@ -9,7 +9,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Consumer;
 
-public class HttpDecoder {
+public class HttpServerCodec {
 
     enum State {
         SKIP_SPACE,
@@ -34,25 +34,25 @@ public class HttpDecoder {
     private HeaderState headerStateAfterSP;
 
     // method & version
-    private char[] reqLineBuf = new char[8]; // because HTTP/1.1 has 8 char, so 8 is enough
+    private final char[] reqLineBuf = new char[8]; // because HTTP/1.1 has 8 char, so 8 is enough
     private int reqLineBufIndex = 0; // next can read or write index
 
     // path
-    private StringBuilder pathBuilder = new StringBuilder();
+    private final StringBuilder pathBuilder = new StringBuilder();
 
     // header
-    private StringBuilder headerKeyBuilder = new StringBuilder();
-    private StringBuilder headerValBuilder = new StringBuilder();
+    private final StringBuilder headerKeyBuilder = new StringBuilder();
+    private final StringBuilder headerValBuilder = new StringBuilder();
     private boolean headerKeyBeginWithCR = false;
     private boolean headerValLastReadCR = false;
-    private Map<String, String> headers = new HashMap<>();
+    private final Map<String, String> headers = new HashMap<>();
 
     // body
-    private Deque<ByteBuffer> buffers;
+    private final Deque<ByteBuffer> buffers;
     private int currentLen;
     private int expectLen;
 
-    public HttpDecoder() {
+    public HttpServerCodec() {
         this.buffers = new ArrayDeque<>();
     }
 
