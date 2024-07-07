@@ -251,6 +251,7 @@ public class NioSocketChannel extends AbstractNioChannel implements NioChannel  
                             // release buf
                             break;
                         } else if (c > 0) {
+                            buf.flip();
                             pipeline.fireChannelRead(buf);
                             if (c < available) {
                                 break;

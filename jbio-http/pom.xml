@@ -6,7 +6,7 @@
     <parent>
         <groupId>org.jaybill</groupId>
         <artifactId>jbio</artifactId>
-        <version>1.0-SNAPSHOT</version>
+        <version>${revision}</version>
     </parent>
 
     <artifactId>jbio-http</artifactId>
@@ -17,4 +17,11 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 
+    <dependencies>
+        <dependency>
+            <groupId>org.jaybill</groupId>
+            <artifactId>jbio-core</artifactId>
+            <version>${revision}</version>
+        </dependency>
+    </dependencies>
 </project>
