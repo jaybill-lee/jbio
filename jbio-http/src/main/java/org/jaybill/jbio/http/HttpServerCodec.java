@@ -5,8 +5,6 @@ import org.jaybill.jbio.http.ex.HttpProtocolException;
 import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
 import java.util.Deque;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.function.Consumer;
 
 public class HttpServerCodec {
@@ -20,18 +18,9 @@ public class HttpServerCodec {
         READ_BODY
     }
 
-    enum HeaderState {
-        SKIP_SPACE,
-        READ_KEY,
-        READ_COLON,
-        READ_VAL
-    }
-
     // state machine
-    private State state = State.READ_METHOD;
-    private State stateAfterSP; // for process space
-    private HeaderState headerState;
-    private HeaderState headerStateAfterSP;
+    private State state = State.SKIP_SPACE;
+    private State stateAfterSP = State.READ_METHOD; // for process space
 
     // method & version
     private final char[] reqLineBuf = new char[8]; // because HTTP/1.1 has 8 char, so 8 is enough
@@ -41,11 +30,7 @@ public class HttpServerCodec {
     private final StringBuilder pathBuilder = new StringBuilder();
 
     // header
-    private final StringBuilder headerKeyBuilder = new StringBuilder();
-    private final StringBuilder headerValBuilder = new StringBuilder();
-    private boolean headerKeyBeginWithCR = false;
-    private boolean headerValLastReadCR = false;
-    private final Map<String, String> headers = new HashMap<>();
+    private final HeaderCodec headerCodec;
 
     // body
     private final Deque<ByteBuffer> buffers;
@@ -54,6 +39,7 @@ public class HttpServerCodec {
 
     public HttpServerCodec() {
         this.buffers = new ArrayDeque<>();
+        this.headerCodec = new HeaderCodec();
     }
 
     public void decode(ByteBuffer buf, Consumer<HttpDecodeEvent> consumer) {
@@ -148,66 +134,16 @@ public class HttpServerCodec {
     }
 
     private void readHeaders(byte b, ByteBuffer buf, Consumer<HttpDecodeEvent> consumer) {
-        switch (headerState) {
-            case SKIP_SPACE -> {
-                if (b != ' ') {
-                    headerState = headerStateAfterSP;
-                    buf.reset();
-                }
+        var headers = headerCodec.readHeaders(b, buf);
+        if (headers != null) {
+            consumer.accept(new HttpDecodeEvent(HttpDecodeEvent.Type.HEADERS, headers));
+            var lenStr = headers.get(GeneralHttpHeader.CONTENT_LENGTH);
+            if (lenStr == null) {
+                expectLen = 0;
+            } else {
+                expectLen = Integer.parseInt(lenStr);
             }
-            case READ_KEY -> {
-                headerValLastReadCR = false;
-                if (headerKeyBuilder.isEmpty()) {
-                    if (b == '\r') {
-                        headerKeyBeginWithCR = true;
-                    } else if (b == '\n') {
-                        endHeaders(consumer);
-                    } else {
-                        headerKeyBuilder.append((char) b);
-                    }
-                } else if (headerKeyBeginWithCR){
-                    if (b != '\n') {
-                        buf.reset(); // to last pos
-                    }
-                    endHeaders(consumer);
-                } else {
-                    if (b == ' ') {
-                        headerState = HeaderState.SKIP_SPACE;
-                        headerStateAfterSP = HeaderState.READ_COLON;
-                    } else if (b == ':') {
-                        headerState = HeaderState.READ_COLON;
-                        buf.reset();
-                    } else {
-                        if (b == '\r' || b == '\n') {
-                            throw new HttpProtocolException();
-                        }
-                        headerKeyBuilder.append((char) b);
-                    }
-                }
-            }
-            case READ_COLON -> {
-                if (b != ':') {
-                    throw new HttpProtocolException();
-                }
-                headerState = HeaderState.SKIP_SPACE;
-                headerStateAfterSP = HeaderState.READ_VAL;
-            }
-            case READ_VAL -> {
-                if (headerValLastReadCR) {
-                    if (b != '\n') {
-                        buf.reset();
-                    }
-                    endHeaderLine();
-                } else {
-                    if (b == '\r') {
-                        headerValLastReadCR = true;
-                    } else if (b == '\n') {
-                        endHeaderLine();
-                    } else {
-                        headerValBuilder.append((char) b);
-                    }
-                }
-            }
+            state = State.READ_BODY;
         }
     }
 
@@ -293,41 +229,11 @@ public class HttpServerCodec {
     private void endReqLine() {
         state = State.SKIP_SPACE;
         stateAfterSP = State.READ_HEADERS;
-        headerState = HeaderState.SKIP_SPACE;
-        headerStateAfterSP = HeaderState.READ_KEY;
         reqLineBufIndex = 0;
-    }
-
-    private void endHeaderLine() {
-        headers.put(headerKeyBuilder.toString(), headerValBuilder.toString());
-        // clear
-        headerKeyBuilder.setLength(0);
-        headerValBuilder.setLength(0);
-        // next
-        headerState = HeaderState.SKIP_SPACE;
-        headerStateAfterSP = HeaderState.READ_KEY;
-    }
-
-    private void endHeaders(Consumer<HttpDecodeEvent> consumer) {
-        var lenStr = headers.get(GeneralHttpHeader.CONTENT_LENGTH);
-        if (lenStr == null) {
-            expectLen = 0;
-        } else {
-            expectLen = Integer.parseInt(lenStr);
-        }
-
-        state = State.READ_BODY;
-        consumer.accept(new HttpDecodeEvent(HttpDecodeEvent.Type.HEADERS, headers));
-        headerKeyBuilder.setLength(0);
-        headerValBuilder.setLength(0);
     }
 
     private void reuse() {
         state = State.READ_METHOD;
         stateAfterSP = null;
-        headerState = null;
-        headerStateAfterSP = null;
-        headerKeyBeginWithCR = false;
-        headerValLastReadCR = false;
     }
 }
