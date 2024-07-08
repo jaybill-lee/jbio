@@ -3,8 +3,6 @@ package org.jaybill.jbio.http;
 import org.jaybill.jbio.http.ex.HttpProtocolException;
 
 import java.nio.ByteBuffer;
-import java.util.ArrayDeque;
-import java.util.Deque;
 import java.util.function.Consumer;
 
 public class HttpServerCodec {
@@ -33,12 +31,9 @@ public class HttpServerCodec {
     private final HeaderCodec headerCodec;
 
     // body
-    private final Deque<ByteBuffer> buffers;
-    private int currentLen;
-    private int expectLen;
+    private BodyReader bodyReader = null;
 
     public HttpServerCodec() {
-        this.buffers = new ArrayDeque<>();
         this.headerCodec = new HeaderCodec();
     }
 
@@ -137,43 +132,16 @@ public class HttpServerCodec {
         var headers = headerCodec.readHeaders(b, buf);
         if (headers != null) {
             consumer.accept(new HttpDecodeEvent(HttpDecodeEvent.Type.HEADERS, headers));
-            var lenStr = headers.get(GeneralHttpHeader.CONTENT_LENGTH);
-            if (lenStr == null) {
-                expectLen = 0;
-            } else {
-                expectLen = Integer.parseInt(lenStr);
-            }
+            bodyReader = new BodyReader(GeneralHttpHeader.getContentLength(headers));
             state = State.READ_BODY;
         }
     }
 
     private void readBody(ByteBuffer buf, Consumer<HttpDecodeEvent> consumer) {
         buf.reset();
-        if (currentLen < expectLen) {
-            int len = currentLen + buf.remaining();
-            if (len > expectLen) {
-                int newLimit = buf.position() + (expectLen - currentLen);
-                var newBuf = buf.duplicate();
-                newBuf.position(buf.position());
-                newBuf.limit(newLimit);
-                buf.position(newLimit);
-                currentLen = expectLen;
-                buffers.add(newBuf);
-                consumer.accept(new HttpDecodeEvent(HttpDecodeEvent.Type.BODY, buffers));
-            } else {
-                var limit = buf.limit();
-                var newBuf = buf.duplicate();
-                newBuf.position(buf.position());
-                newBuf.limit(limit);
-                buf.position(limit);
-                currentLen = len;
-                buffers.add(newBuf);
-                if (currentLen == expectLen) {
-                    consumer.accept(new HttpDecodeEvent(HttpDecodeEvent.Type.BODY, buffers));
-                    reuse();
-                }
-            }
-        } else {
+        var buffers = bodyReader.readBody(buf);
+        if (buffers != null) {
+            consumer.accept(new HttpDecodeEvent(HttpDecodeEvent.Type.BODY, buffers));
             reuse();
         }
     }
@@ -233,7 +201,8 @@ public class HttpServerCodec {
     }
 
     private void reuse() {
-        state = State.READ_METHOD;
-        stateAfterSP = null;
+        state = State.SKIP_SPACE;
+        stateAfterSP = State.READ_METHOD;
+        bodyReader = null;
     }
 }

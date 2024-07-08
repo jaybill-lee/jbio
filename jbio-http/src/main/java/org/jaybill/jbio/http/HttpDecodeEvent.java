@@ -7,7 +7,14 @@ import lombok.Data;
 @AllArgsConstructor
 public class HttpDecodeEvent {
     public enum Type {
-        METHOD, PATH, VER, HEADERS, BODY
+        // request
+        METHOD, PATH,
+
+        // response
+        STATUS_CODE, REASON_PHRASE,
+
+        // common
+        VER, HEADERS, BODY
     }
 
     private Type type;
