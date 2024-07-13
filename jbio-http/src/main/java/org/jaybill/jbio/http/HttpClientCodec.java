@@ -5,7 +5,7 @@ import org.jaybill.jbio.http.ex.HttpProtocolException;
 import java.nio.ByteBuffer;
 import java.util.function.Consumer;
 
-public class HttpClientCodec {
+public class HttpClientCodec implements HttpCodec<HttpRequest> {
 
     enum State {
         SKIP_SPACE,
@@ -40,6 +40,7 @@ public class HttpClientCodec {
         this.headerCodec = new HeaderCodec();
     }
 
+    @Override
     public void decode(ByteBuffer buf, Consumer<HttpDecodeEvent> consumer) {
         try {
             while (buf.hasRemaining()) {
@@ -59,6 +60,11 @@ public class HttpClientCodec {
         } catch (Exception e) {
             throw new HttpProtocolException();
         }
+    }
+
+    @Override
+    public ByteBuffer encode(HttpRequest request) {
+        return null;
     }
 
     private void skipSpace(byte b, ByteBuffer buf) {

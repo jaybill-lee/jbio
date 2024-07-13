@@ -3,9 +3,10 @@ package org.jaybill.jbio.http;
 import org.jaybill.jbio.http.ex.HttpProtocolException;
 
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.util.function.Consumer;
 
-public class HttpServerCodec {
+public class HttpServerCodec implements HttpCodec<HttpResponse> {
 
     enum State {
         SKIP_SPACE,
@@ -13,7 +14,7 @@ public class HttpServerCodec {
         READ_PATH,
         READ_VERSION,
         READ_HEADERS,
-        READ_BODY
+        READ_BODY,
     }
 
     // state machine
@@ -37,6 +38,7 @@ public class HttpServerCodec {
         this.headerCodec = new HeaderCodec();
     }
 
+    @Override
     public void decode(ByteBuffer buf, Consumer<HttpDecodeEvent> consumer) {
         try {
             while (buf.hasRemaining()) {
@@ -56,6 +58,38 @@ public class HttpServerCodec {
         } catch (Exception e) {
             throw new HttpProtocolException();
         }
+    }
+
+    @Override
+    public ByteBuffer encode(HttpResponse response) {
+        var body = response.getBody();
+        var headers = response.getHeaders();
+        int bodySize = 0;
+        if (body != null) {
+            bodySize = body.length;
+            // add header
+            headers.put(GeneralHttpHeader.CONTENT_LENGTH, String.valueOf(bodySize));
+        }
+
+        // to string
+        var sb = new StringBuilder();
+        sb.append(response.getVersion().getCode()).append(" ")
+                .append(response.getStatusCode()).append(" ")
+                .append(response.getReasonPhrase()).append("\r\n");
+        response.getHeaders().forEach((k, v) -> {
+            sb.append(k).append(":").append(v).append("\r\n");
+        });
+        sb.append("\r\n");
+
+        // to buffer
+        var messageBytes = sb.toString().getBytes(StandardCharsets.UTF_8);
+        var buf = ByteBuffer.allocateDirect(messageBytes.length + bodySize);
+        buf.put(messageBytes);
+        if (body != null) {
+            buf.put(body);
+        }
+        buf.flip();
+        return buf;
     }
 
     private void skipSpace(byte b, ByteBuffer buf) {
@@ -132,8 +166,13 @@ public class HttpServerCodec {
         var headers = headerCodec.readHeaders(b, buf);
         if (headers != null) {
             consumer.accept(new HttpDecodeEvent(HttpDecodeEvent.Type.HEADERS, headers));
-            bodyReader = new BodyReader(GeneralHttpHeader.getContentLength(headers));
-            state = State.READ_BODY;
+            int length = GeneralHttpHeader.getContentLength(headers);
+            if (length == 0) {
+                consumer.accept(new HttpDecodeEvent(HttpDecodeEvent.Type.END, null));
+            } else {
+                bodyReader = new BodyReader(length);
+                state = State.READ_BODY;
+            }
         }
     }
 
@@ -142,6 +181,7 @@ public class HttpServerCodec {
         var buffers = bodyReader.readBody(buf);
         if (buffers != null) {
             consumer.accept(new HttpDecodeEvent(HttpDecodeEvent.Type.BODY, buffers));
+            consumer.accept(new HttpDecodeEvent(HttpDecodeEvent.Type.END, null));
             reuse();
         }
     }
@@ -188,7 +228,7 @@ public class HttpServerCodec {
         }
         state = State.SKIP_SPACE;
         stateAfterSP = State.READ_PATH;
-        consumer.accept(new HttpDecodeEvent(HttpDecodeEvent.Type.METHOD, method.name()));
+        consumer.accept(new HttpDecodeEvent(HttpDecodeEvent.Type.METHOD, method));
 
         // reuse
         reqLineBufIndex = 0;

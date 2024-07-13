@@ -292,8 +292,15 @@ public class NioSocketChannel extends AbstractNioChannel implements NioChannel  
     }
 
     private final class HeadHandler extends DefaultChannelDuplexHandler {
+
         @Override
-        public CompletableFuture<Void> write(ChannelHandlerContext ctx, ByteBuffer buf) {
+        public void close(ChannelHandlerContext ctx) {
+            unsafe.close();
+        }
+
+        @Override
+        public CompletableFuture<Void> write(ChannelHandlerContext ctx, Object b) {
+            var buf = (ByteBuffer) b;
             sendBuffer.add(buf);
             var writeBehavior = workerConfig.getWriteBehavior();
             if (writeBehavior.getHighWatermark() <= sendBuffer.unsentBytes()) {
@@ -343,7 +350,7 @@ public class NioSocketChannel extends AbstractNioChannel implements NioChannel  
         }
 
         @Override
-        public CompletableFuture<Void> writeAndFlush(ChannelHandlerContext ctx, ByteBuffer buf) {
+        public CompletableFuture<Void> writeAndFlush(ChannelHandlerContext ctx, Object buf) {
             this.write(ctx, buf);
             return this.flush(ctx);
         }

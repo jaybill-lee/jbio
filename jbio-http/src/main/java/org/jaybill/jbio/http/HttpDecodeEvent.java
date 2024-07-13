@@ -14,7 +14,7 @@ public class HttpDecodeEvent {
         STATUS_CODE, REASON_PHRASE,
 
         // common
-        VER, HEADERS, BODY
+        VER, HEADERS, BODY, END
     }
 
     private Type type;

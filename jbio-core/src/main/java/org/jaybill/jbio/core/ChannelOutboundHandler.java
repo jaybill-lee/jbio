@@ -1,13 +1,14 @@
 package org.jaybill.jbio.core;
 
-import java.nio.ByteBuffer;
 import java.util.concurrent.CompletableFuture;
 
 public interface ChannelOutboundHandler extends ChannelHandler {
 
-    CompletableFuture<Void> write(ChannelHandlerContext ctx, ByteBuffer buf);
+    void close(ChannelHandlerContext ctx);
+
+    CompletableFuture<Void> write(ChannelHandlerContext ctx, Object buf);
 
     CompletableFuture<Void> flush(ChannelHandlerContext ctx);
 
-    CompletableFuture<Void> writeAndFlush(ChannelHandlerContext ctx, ByteBuffer buf);
+    CompletableFuture<Void> writeAndFlush(ChannelHandlerContext ctx, Object buf);
 }

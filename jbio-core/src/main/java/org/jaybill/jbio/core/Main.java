@@ -59,7 +59,12 @@ public class Main {
                         }
 
                         @Override
-                        public CompletableFuture<Void> write(ChannelHandlerContext ctx, ByteBuffer buf) {
+                        public void close(ChannelHandlerContext ctx) {
+
+                        }
+
+                        @Override
+                        public CompletableFuture<Void> write(ChannelHandlerContext ctx, Object buf) {
                             return null;
                         }
 
@@ -69,7 +74,7 @@ public class Main {
                         }
 
                         @Override
-                        public CompletableFuture<Void> writeAndFlush(ChannelHandlerContext ctx, ByteBuffer buf) {
+                        public CompletableFuture<Void> writeAndFlush(ChannelHandlerContext ctx, Object buf) {
                             return null;
                         }
                     });

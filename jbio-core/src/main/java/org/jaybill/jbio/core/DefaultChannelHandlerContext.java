@@ -1,6 +1,5 @@
 package org.jaybill.jbio.core;
 
-import java.nio.ByteBuffer;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.BiConsumer;
 
@@ -73,17 +72,25 @@ public class DefaultChannelHandlerContext implements ChannelHandlerContext {
     }
 
     @Override
-    public CompletableFuture<Void> fireChannelWrite(ByteBuffer buf) {
+    public void fireChannelClose() {
+        this.doInvokeOutbound(ChannelOutboundHandler::close);
+    }
+
+    @Override
+    public CompletableFuture<Void> fireChannelWrite(Object buf) {
+        this.doInvokeOutbound((handler, ctx) -> handler.write(ctx, buf));
         return null;
     }
 
     @Override
     public CompletableFuture<Void> fireChannelFlush() {
+        this.doInvokeOutbound(ChannelOutboundHandler::flush);
         return null;
     }
 
     @Override
-    public CompletableFuture<Void> fireChannelWriteAndFlush(ByteBuffer buf) {
+    public CompletableFuture<Void> fireChannelWriteAndFlush(Object buf) {
+        this.doInvokeOutbound((handler, ctx) -> handler.writeAndFlush(ctx, buf));
         return null;
     }
 
@@ -96,6 +103,21 @@ public class DefaultChannelHandlerContext implements ChannelHandlerContext {
                     break;
                 } else {
                     cur = this.next;
+                }
+            }
+            return cur;
+        });
+    }
+
+    private void doInvokeOutbound(BiConsumer<ChannelOutboundHandler, DefaultChannelHandlerContext> consumer) {
+        eventLoop.submitTask(() -> {
+            DefaultChannelHandlerContext cur = this.prev;
+            while (cur != null) {
+                if (cur.handler() instanceof ChannelOutboundHandler handler) {
+                    consumer.accept(handler, cur);
+                    break;
+                } else {
+                    cur = this.prev;
                 }
             }
             return cur;

@@ -241,6 +241,11 @@ public class NioServerSocketChannel extends AbstractNioChannel implements NioCha
         }
     }
 
-    private class HeadHandler extends DefaultChannelDuplexHandler {}
+    private class HeadHandler extends DefaultChannelDuplexHandler {
+        @Override
+        public void close(ChannelHandlerContext ctx) {
+            unsafe.close();
+        }
+    }
     private class TailHandler extends DefaultChannelDuplexHandler {}
 }

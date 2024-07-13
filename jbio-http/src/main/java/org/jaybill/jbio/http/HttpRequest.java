@@ -1,12 +1,14 @@
 package org.jaybill.jbio.http;
 
-import java.nio.ByteBuffer;
-import java.util.Map;
+import lombok.Data;
 
-public class HttpRequest {
+import java.nio.ByteBuffer;
+import java.util.Queue;
+
+@Data
+public class HttpRequest extends HttpMessage {
     private HttpMethod method;
     private String path;
     private HttpVersion version;
-    private Map<String, String> headers;
-    private ByteBuffer body;
+    private Queue<ByteBuffer> body;
 }

@@ -1,6 +1,5 @@
 package org.jaybill.jbio.core;
 
-import java.nio.ByteBuffer;
 import java.util.concurrent.CompletableFuture;
 
 public interface ChannelHandlerInvoker {
@@ -16,7 +15,8 @@ public interface ChannelHandlerInvoker {
     void fireChannelWritable();
 
     // outbound event
-    CompletableFuture<Void> fireChannelWrite(ByteBuffer buf);
+    void fireChannelClose();
+    CompletableFuture<Void> fireChannelWrite(Object o);
     CompletableFuture<Void> fireChannelFlush();
-    CompletableFuture<Void> fireChannelWriteAndFlush(ByteBuffer buf);
+    CompletableFuture<Void> fireChannelWriteAndFlush(Object buf);
 }

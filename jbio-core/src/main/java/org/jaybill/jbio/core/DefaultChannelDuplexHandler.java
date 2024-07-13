@@ -1,6 +1,5 @@
 package org.jaybill.jbio.core;
 
-import java.nio.ByteBuffer;
 import java.util.concurrent.CompletableFuture;
 
 public class DefaultChannelDuplexHandler implements ChannelInboundHandler, ChannelOutboundHandler {
@@ -51,7 +50,12 @@ public class DefaultChannelDuplexHandler implements ChannelInboundHandler, Chann
     }
 
     @Override
-    public CompletableFuture<Void> write(ChannelHandlerContext ctx, ByteBuffer buf) {
+    public void close(ChannelHandlerContext ctx) {
+        ctx.fireChannelClose();
+    }
+
+    @Override
+    public CompletableFuture<Void> write(ChannelHandlerContext ctx, Object buf) {
         return ctx.fireChannelWrite(buf);
     }
 
@@ -61,7 +65,7 @@ public class DefaultChannelDuplexHandler implements ChannelInboundHandler, Chann
     }
 
     @Override
-    public CompletableFuture<Void> writeAndFlush(ChannelHandlerContext ctx, ByteBuffer buf) {
-        return ctx.fireChannelWriteAndFlush(buf);
+    public CompletableFuture<Void> writeAndFlush(ChannelHandlerContext ctx, Object o) {
+        return ctx.fireChannelWriteAndFlush(o);
     }
 }
