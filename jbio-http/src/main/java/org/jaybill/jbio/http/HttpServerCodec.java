@@ -4,6 +4,7 @@ import org.jaybill.jbio.http.ex.HttpProtocolException;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 public class HttpServerCodec implements HttpCodec<HttpResponse> {
@@ -169,6 +170,7 @@ public class HttpServerCodec implements HttpCodec<HttpResponse> {
             int length = GeneralHttpHeader.getContentLength(headers);
             if (length == 0) {
                 consumer.accept(new HttpDecodeEvent(HttpDecodeEvent.Type.END, null));
+                reuse();
             } else {
                 bodyReader = new BodyReader(length);
                 state = State.READ_BODY;

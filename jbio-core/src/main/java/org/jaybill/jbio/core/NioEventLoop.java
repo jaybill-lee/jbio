@@ -21,10 +21,10 @@ public class NioEventLoop implements EventLoop, Runnable {
     private Selector selector;
     private SelectorProvider provider;
 
-    public NioEventLoop(SelectorProvider provider) {
+    public NioEventLoop(SelectorProvider provider, String namePrefix) {
         this.provider = provider;
         this.started = new AtomicBoolean(false);
-        this.thread = new Thread(this, "nio-eventloop-" + COUNTER.getAndAdd(1));
+        this.thread = new Thread(this, namePrefix + COUNTER.getAndAdd(1));
         this.taskQueue = new MpscArrayQueue<>(16);
         try {
             this.selector = provider.openSelector();

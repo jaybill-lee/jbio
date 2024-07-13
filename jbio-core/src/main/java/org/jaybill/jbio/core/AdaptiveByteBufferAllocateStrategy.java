@@ -12,6 +12,6 @@ public class AdaptiveByteBufferAllocateStrategy implements ByteBufferAllocateStr
 
     @Override
     public ByteBuffer allocate() {
-        return delegate.allocate(1024);
+        return delegate.allocate(128);
     }
 }

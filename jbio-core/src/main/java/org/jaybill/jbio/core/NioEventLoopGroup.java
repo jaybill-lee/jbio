@@ -8,10 +8,10 @@ public class NioEventLoopGroup implements EventLoopGroup {
     private final NioEventLoop [] loops;
     private AtomicInteger counter = new AtomicInteger(0);
 
-    public NioEventLoopGroup(int n, SelectorProvider provider) {
+    public NioEventLoopGroup(int n, SelectorProvider provider, String namePrefix) {
         loops = new NioEventLoop[n];
         for (int i = 0; i < n; i++) {
-            loops[i] = new NioEventLoop(provider);
+            loops[i] = new NioEventLoop(provider, namePrefix);
         }
     }
 

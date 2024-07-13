@@ -95,7 +95,7 @@ public class HttpServerCodecHandler extends DefaultChannelDuplexHandler {
                 waitForFlushResponseMap.remove(id);
 
                 // encode and write
-                var waitForFlushBuf = codec.encode(resp);
+                var waitForFlushBuf = codec.encode(waitForFlushResp);
                 consumer.accept(waitForFlushBuf);
 
                 // next request

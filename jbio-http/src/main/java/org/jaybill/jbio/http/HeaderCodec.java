@@ -40,7 +40,6 @@ public class HeaderCodec {
                 }
             }
             case READ_KEY -> {
-                headerValLastReadCR = false;
                 if (headerKeyBuilder.isEmpty()) {
                     if (b == '\r') {
                         headerKeyBeginWithCR = true;
@@ -97,6 +96,8 @@ public class HeaderCodec {
     }
 
     void reuse() {
+        headerValLastReadCR = false;
+        headerKeyBeginWithCR = false;
         // clear
         headerKeyBuilder.setLength(0);
         headerValBuilder.setLength(0);

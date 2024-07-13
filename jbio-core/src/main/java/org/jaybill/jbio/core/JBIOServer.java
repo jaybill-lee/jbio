@@ -37,8 +37,8 @@ public class JBIOServer {
     public JBIOServer eventLoop(int bosses, int workers) {
         this.bosses = bosses;
         this.workers = workers;
-        this.bossGroup = new NioEventLoopGroup(bosses, provider);
-        this.workerGroup = new NioEventLoopGroup(workers, provider);
+        this.bossGroup = new NioEventLoopGroup(bosses, provider, "nio-boss-eventloop-");
+        this.workerGroup = new NioEventLoopGroup(workers, provider, "nio-worker-eventloop-");
         return this;
     }
 
