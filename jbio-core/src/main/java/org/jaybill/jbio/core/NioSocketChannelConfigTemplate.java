@@ -3,7 +3,6 @@ package org.jaybill.jbio.core;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 
-import java.lang.reflect.InvocationTargetException;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
@@ -28,7 +27,7 @@ public class NioSocketChannelConfigTemplate extends NioChannelConfigTemplate {
 
         // read
         DEFAULT.setMaxReadCountPerLoop(100);
-        DEFAULT.setStrategyCls(FixLengthByteBufferAllocateStrategy.class);
+        DEFAULT.setStrategyCls(FixInstanceByteBufferAllocateStrategy.class);
 
         // write
         DEFAULT.setSpinCount(100);
@@ -65,7 +64,7 @@ public class NioSocketChannelConfigTemplate extends NioChannelConfigTemplate {
             strategy = strategyCls.getDeclaredConstructor(ByteBufferAllocator.class).newInstance(allocator);
         } catch (Exception e) {
             log.warn("can not create strategy, use FixLengthByteBufferAllocateStrategy, e:", e);
-            strategy = new FixLengthByteBufferAllocateStrategy(allocator);
+            strategy = new FixInstanceByteBufferAllocateStrategy(allocator);
         }
         readBehavior.setStrategy(strategy);
         config.setReadBehavior(readBehavior);

@@ -240,7 +240,7 @@ public class NioSocketChannel extends AbstractNioChannel implements NioChannel  
                     var strategy = workerConfig.getReadBehavior().getStrategy();
                     for (int i = 0; i < maxReadCount; i++) {
                         var buf = strategy.allocate();
-                        int available = buf.limit() - buf.position();
+                        int available = buf.remaining();
                         int c = socketChannel.read(buf);
                         if (c == -1) {
                             socketChannel.close();
