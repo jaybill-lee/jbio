@@ -1,5 +1,6 @@
 package org.jaybill.jbio.http;
 
+import org.jaybill.jbio.core.ByteBufferAllocator;
 import org.jaybill.jbio.http.ex.HttpProtocolException;
 
 import java.nio.ByteBuffer;
@@ -63,7 +64,7 @@ public class HttpClientCodec implements HttpCodec<HttpRequest> {
     }
 
     @Override
-    public ByteBuffer encode(HttpRequest request) {
+    public ByteBuffer encode(HttpRequest request, ByteBufferAllocator allocator) {
         return null;
     }
 

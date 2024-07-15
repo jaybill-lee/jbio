@@ -2,11 +2,11 @@ package org.jaybill.jbio.core;
 
 import java.nio.ByteBuffer;
 
-public class AdaptiveByteBufferAllocateStrategy implements ByteBufferAllocateStrategy {
+public class FixLengthByteBufferAllocateStrategy implements ByteBufferAllocateStrategy {
 
     private final ByteBufferAllocator delegate;
 
-    public AdaptiveByteBufferAllocateStrategy(ByteBufferAllocator delegate) {
+    public FixLengthByteBufferAllocateStrategy(ByteBufferAllocator delegate) {
         this.delegate = delegate;
     }
 

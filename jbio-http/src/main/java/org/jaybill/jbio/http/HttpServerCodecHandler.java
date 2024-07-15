@@ -83,7 +83,7 @@ public class HttpServerCodecHandler extends DefaultChannelDuplexHandler {
             requestIdQueue.poll();
 
             // encode and write
-            var buf = codec.encode(resp);
+            var buf = codec.encode(resp, ctx.channel().allocator());
             consumer.accept(buf);
 
             // try to flush other request, support HTTP pipeline
@@ -95,7 +95,7 @@ public class HttpServerCodecHandler extends DefaultChannelDuplexHandler {
                 waitForFlushResponseMap.remove(id);
 
                 // encode and write
-                var waitForFlushBuf = codec.encode(waitForFlushResp);
+                var waitForFlushBuf = codec.encode(waitForFlushResp, ctx.channel().allocator());
                 consumer.accept(waitForFlushBuf);
 
                 // next request

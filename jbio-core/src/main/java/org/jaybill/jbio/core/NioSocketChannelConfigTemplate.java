@@ -28,7 +28,7 @@ public class NioSocketChannelConfigTemplate extends NioChannelConfigTemplate {
 
         // read
         DEFAULT.setMaxReadCountPerLoop(100);
-        DEFAULT.setStrategyCls(AdaptiveByteBufferAllocateStrategy.class);
+        DEFAULT.setStrategyCls(FixLengthByteBufferAllocateStrategy.class);
 
         // write
         DEFAULT.setSpinCount(100);
@@ -51,8 +51,8 @@ public class NioSocketChannelConfigTemplate extends NioChannelConfigTemplate {
         ByteBufferAllocator allocator;
         try {
             allocator = allocatorCls.getDeclaredConstructor().newInstance();
-        } catch (InstantiationException | IllegalAccessException | InvocationTargetException | NoSuchMethodException e) {
-            log.warn("can not create allocator, use default", e);
+        } catch (Exception e) {
+            log.warn("can not create allocator, use UnpooledByteBufferAllocator, e:", e);
             allocator = new UnpooledByteBufferAllocator();
         }
         config.setAllocator(allocator);
@@ -63,9 +63,9 @@ public class NioSocketChannelConfigTemplate extends NioChannelConfigTemplate {
         ByteBufferAllocateStrategy strategy;
         try {
             strategy = strategyCls.getDeclaredConstructor(ByteBufferAllocator.class).newInstance(allocator);
-        } catch (InstantiationException | IllegalAccessException | InvocationTargetException | NoSuchMethodException e) {
-            log.warn("can not create strategy, use default", e);
-            strategy = new AdaptiveByteBufferAllocateStrategy(allocator);
+        } catch (Exception e) {
+            log.warn("can not create strategy, use FixLengthByteBufferAllocateStrategy, e:", e);
+            strategy = new FixLengthByteBufferAllocateStrategy(allocator);
         }
         readBehavior.setStrategy(strategy);
         config.setReadBehavior(readBehavior);

@@ -1,5 +1,7 @@
 package org.jaybill.jbio.http;
 
+import org.jaybill.jbio.core.ByteBufferAllocator;
+
 import java.nio.ByteBuffer;
 import java.util.function.Consumer;
 
@@ -17,5 +19,5 @@ public interface HttpCodec<T extends HttpMessage> {
      * @param message request or response
      * @return
      */
-    ByteBuffer encode(T message);
+    ByteBuffer encode(T message, ByteBufferAllocator allocator);
 }

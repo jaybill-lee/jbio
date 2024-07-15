@@ -1,10 +1,10 @@
 package org.jaybill.jbio.http;
 
+import org.jaybill.jbio.core.ByteBufferAllocator;
 import org.jaybill.jbio.http.ex.HttpProtocolException;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 public class HttpServerCodec implements HttpCodec<HttpResponse> {
@@ -62,7 +62,7 @@ public class HttpServerCodec implements HttpCodec<HttpResponse> {
     }
 
     @Override
-    public ByteBuffer encode(HttpResponse response) {
+    public ByteBuffer encode(HttpResponse response, ByteBufferAllocator allocator) {
         var body = response.getBody();
         var headers = response.getHeaders();
         int bodySize = 0;
@@ -84,7 +84,7 @@ public class HttpServerCodec implements HttpCodec<HttpResponse> {
 
         // to buffer
         var messageBytes = sb.toString().getBytes(StandardCharsets.UTF_8);
-        var buf = ByteBuffer.allocateDirect(messageBytes.length + bodySize);
+        var buf = allocator.allocate(messageBytes.length + bodySize);
         buf.put(messageBytes);
         if (body != null) {
             buf.put(body);
