@@ -29,5 +29,5 @@ public interface NioChannel {
 
     ChannelPipeline pipeline();
 
-    CompletableFuture<? extends NioChannel> open(NioEventLoop eventLoop);
+    CompletableFuture<? extends NioChannel> open();
 }

@@ -47,8 +47,9 @@ public class JBIOServer {
     }
 
     public CompletableFuture<NioServerSocketChannel> start(String host, int port, Integer backlog) {
-        var serverSocketChannel = new NioServerSocketChannel(provider, bossConfigTemplate, workerConfigTemplate,
+        var serverSocketChannel = new NioServerSocketChannel(provider, bossGroup.next(),
+                bossConfigTemplate, workerConfigTemplate,
                 bossInitializer, workerInitializer, workerGroup, host, port, backlog);
-        return serverSocketChannel.open(bossGroup.next());
+        return serverSocketChannel.open();
     }
 }

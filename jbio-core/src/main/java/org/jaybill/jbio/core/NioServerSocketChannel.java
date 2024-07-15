@@ -12,6 +12,7 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 @Slf4j
 public class NioServerSocketChannel extends AbstractNioChannel implements NioChannel {
@@ -25,9 +26,9 @@ public class NioServerSocketChannel extends AbstractNioChannel implements NioCha
     private final int port;
     private final Integer backlog;
     private final NioEventLoopGroup workerGroup;
+    private final NioEventLoop eventLoop;
+    private final ChannelPipeline pipeline;
 
-    private NioEventLoop eventLoop;
-    private ChannelPipeline pipeline;
     private ServerSocketChannel serverSocketChannel;
     private SelectionKey selectionKey;
 
@@ -36,10 +37,11 @@ public class NioServerSocketChannel extends AbstractNioChannel implements NioCha
     private static final int INIT = 0;
     private static final int ACTIVING = 1;
     private static final int ACTIVE = 2;
-    private static final int INACTIVE = -1;
+    private static final int CLOSED = -1;
 
     NioServerSocketChannel(
             SelectorProvider provider,
+            NioEventLoop eventLoop,
             NioChannelConfigTemplate bossConfigTemplate,
             NioSocketChannelConfigTemplate workerConfigTemplate,
             NioChannelInitializer bossInitializer,
@@ -57,6 +59,8 @@ public class NioServerSocketChannel extends AbstractNioChannel implements NioCha
         this.host = host;
         this.port = port;
         this.backlog = backlog;
+        this.eventLoop = eventLoop;
+        this.pipeline = new DefaultChannelPipeline(new HeadHandler(), new TailHandler(), this, eventLoop);
     }
 
     @Override
@@ -75,15 +79,13 @@ public class NioServerSocketChannel extends AbstractNioChannel implements NioCha
     }
 
     @Override
-    public CompletableFuture<NioServerSocketChannel> open(NioEventLoop eventLoop) {
+    public CompletableFuture<NioServerSocketChannel> open() {
         if (!state.compareAndSet(INIT, ACTIVING)) {
             while (stateFuture == null) {
                 Thread.onSpinWait();
             }
             return stateFuture;
         }
-        this.eventLoop = eventLoop;
-        this.pipeline = new DefaultChannelPipeline(new HeadHandler(), new TailHandler(), this, eventLoop);
         stateFuture = eventLoop.submitTask(() -> {
             unsafe.init();
             unsafe.bind();
@@ -91,7 +93,7 @@ public class NioServerSocketChannel extends AbstractNioChannel implements NioCha
             return this;
         }).whenComplete((r, t) -> {
             if (t != null) {
-                state.compareAndSet(ACTIVING, INACTIVE);
+                state.compareAndSet(ACTIVING, CLOSED);
             } else {
                 state.compareAndSet(ACTIVING, ACTIVE);
             }
@@ -229,9 +231,9 @@ public class NioServerSocketChannel extends AbstractNioChannel implements NioCha
                 return;
             }
 
-            var childCh = new NioSocketChannel(ch, workerConfigTemplate.create(), workerInitializer,
-                    null, null, NioSocketChannel.ACCEPT_MODE);
-            childCh.open(workerGroup.next());
+            var childCh = new NioSocketChannel(ch, workerGroup.next(), workerConfigTemplate.create(),
+                    workerInitializer, null, null, NioSocketChannel.ACCEPT_MODE);
+            childCh.open();
         }
 
         private void setOption(SocketOption<?> k, Object v) throws IOException {

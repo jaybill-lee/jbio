@@ -25,10 +25,10 @@ public class NioSocketChannel extends AbstractNioChannel implements NioChannel  
     private final String host;
     private final Integer port;
     private final int mode;
+    private final NioEventLoop eventLoop;
+    private final ChannelPipeline pipeline;
 
-    private NioEventLoop eventLoop;
     private SelectionKey selectionKey;
-    private ChannelPipeline pipeline;
     private SendBuffer sendBuffer;
     private boolean channelUnWritable = false;
 
@@ -37,10 +37,9 @@ public class NioSocketChannel extends AbstractNioChannel implements NioChannel  
     private static final int INIT = 0;
     private static final int ACTIVING = 1;
     private static final int ACTIVE = 2;
-    private static final int CLOSED = -2;
-    private static final int INACTIVE = -1;
+    private static final int CLOSED = -1;
 
-    public NioSocketChannel(SocketChannel socketChannel, NioSocketChannelConfig workerConfig,
+    public NioSocketChannel(SocketChannel socketChannel, NioEventLoop eventLoop, NioSocketChannelConfig workerConfig,
                 NioChannelInitializer initializer, String host, Integer port, int mode) {
         super();
         this.unsafe = new ChannelUnsafe();
@@ -50,6 +49,8 @@ public class NioSocketChannel extends AbstractNioChannel implements NioChannel  
         this.host = host;
         this.port = port;
         this.mode = mode;
+        this.eventLoop = eventLoop;
+        this.pipeline = new DefaultChannelPipeline(new HeadHandler(), new TailHandler(), this, eventLoop);
     }
 
     @Override
@@ -75,15 +76,13 @@ public class NioSocketChannel extends AbstractNioChannel implements NioChannel  
     }
 
     @Override
-    public CompletableFuture<NioSocketChannel> open(NioEventLoop eventLoop) {
+    public CompletableFuture<NioSocketChannel> open() {
         if (!state.compareAndSet(INIT, ACTIVING)) {
             while (stateFuture == null) {
                 Thread.onSpinWait();
             }
             return stateFuture;
         }
-        this.eventLoop = eventLoop;
-        this.pipeline = new DefaultChannelPipeline(new HeadHandler(), new TailHandler(), this, eventLoop);
         stateFuture = eventLoop.submitTask(() -> {
             unsafe.init();
             unsafe.bind();
@@ -91,7 +90,7 @@ public class NioSocketChannel extends AbstractNioChannel implements NioChannel  
             return this;
         }).whenComplete((r, t) -> {
             if (t != null) {
-                state.compareAndSet(ACTIVING, INACTIVE);
+                state.compareAndSet(ACTIVING, CLOSED);
                 ChannelUtil.forceClose(socketChannel);
             } else {
                 state.compareAndSet(ACTIVING, ACTIVE);
