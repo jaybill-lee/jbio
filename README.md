@@ -1,4 +1,4 @@
-The `jbio` is a network programming framework based on `NIO`. <br>
+The `jbio` is a network programming framework based on `NIO`. It is still under intensive development and improvement.<br>
 It draws on the design concept of `netty` and provides a high-performance, easy-to-use, and highly scalable programming interface.<br>
 The project only requires `JDK21` to run.
 <br><br>
