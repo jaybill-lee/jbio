@@ -19,4 +19,9 @@ public class NioEventLoopGroup implements EventLoopGroup {
     public NioEventLoop next() {
         return loops[counter.getAndIncrement() % loops.length];
     }
+
+    @Override
+    public void close() {
+
+    }
 }

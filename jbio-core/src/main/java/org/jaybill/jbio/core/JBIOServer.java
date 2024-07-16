@@ -1,8 +1,11 @@
 package org.jaybill.jbio.core;
 
+import lombok.extern.slf4j.Slf4j;
+
 import java.nio.channels.spi.SelectorProvider;
 import java.util.concurrent.CompletableFuture;
 
+@Slf4j
 public class JBIOServer {
     private final SelectorProvider provider = SelectorProvider.provider();
     private NioChannelConfigTemplate bossConfigTemplate;

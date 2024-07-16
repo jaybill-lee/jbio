@@ -71,6 +71,11 @@ public class NioEventLoop implements EventLoop, Runnable {
     }
 
     @Override
+    public void close() {
+
+    }
+
+    @Override
     public void run() {
         for (;;) {
             try {

@@ -18,4 +18,9 @@ public interface EventLoop {
      * @throws TaskExecutionException if callable throw exception
      */
     <T> CompletableFuture<T> submitTask(Callable<T> c);
+
+    /**
+     * close eventloop
+     */
+    void close();
 }
