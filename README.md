@@ -18,6 +18,7 @@ public static void main(String[] args) {
     // Create a jbio server instance
     var server = JBIOServer.newInstance()
           .config(NioChannelConfigTemplate.DEFAULT, NioSocketChannelConfigTemplate.DEFAULT)
+          .eventLoop(1, Runtime.getRuntime().availableProcessors())
           .initializer(null, channel -> {
               channel.pipeline()
                 .addLast(new HttpServerCodecHandler())
@@ -33,8 +34,7 @@ public static void main(String[] args) {
                         ctx.channel().pipeline().fireChannelWriteAndFlush(resp);
                     }
                 });
-          })
-        .eventLoop(1, Runtime.getRuntime().availableProcessors());
+          });
     // Start server
     server.start("127.0.0.1", 8080).join();
 }
@@ -43,4 +43,9 @@ Step2, request the server
 ```
 curl http://127.0.0.1:8080/hello
 ```
+
+
+
+
+
 
