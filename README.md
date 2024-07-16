@@ -15,12 +15,11 @@ The project only requires `JDK21` to run.
 Step1, create an HTTP server
 ```
 public static void main(String[] args) {
-    // Create a jbio server instance
-    var server = JBIOServer.newInstance()
-          .config(NioChannelConfigTemplate.DEFAULT, NioSocketChannelConfigTemplate.DEFAULT)
-          .eventLoop(1, Runtime.getRuntime().availableProcessors())
-          .initializer(null, channel -> {
-              channel.pipeline()
+    JBIOServer.newInstance()
+        .config(NioChannelConfigTemplate.DEFAULT, NioSocketChannelConfigTemplate.DEFAULT)
+        .eventLoop(1, Runtime.getRuntime().availableProcessors())
+        .initializer(null, channel -> {
+            channel.pipeline()
                 .addLast(new HttpServerCodecHandler())
                 .addLast(new DefaultChannelDuplexHandler() {
                     @Override
@@ -34,9 +33,9 @@ public static void main(String[] args) {
                         ctx.channel().pipeline().fireChannelWriteAndFlush(resp);
                     }
                 });
-          });
-    // Start server
-    server.start("127.0.0.1", 8080).join();
+        })
+        .start("127.0.0.1", 8080)
+        .join();
 }
 ```
 Step2, request the server
