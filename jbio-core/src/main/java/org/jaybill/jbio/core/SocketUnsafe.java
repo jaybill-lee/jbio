@@ -6,5 +6,9 @@ public interface SocketUnsafe extends Unsafe {
 
     void read();
 
-    void write();
+    /**
+     * write ByteBuffer to Channel
+     * @param flush if true, ignore the OP_WRITE and always try to write to channel;
+     */
+    void write(boolean flush);
 }

@@ -60,7 +60,7 @@ public class NioSocketChannel extends AbstractNioChannel implements NioChannel  
         }
         try {
             unsafe.connect();
-            unsafe.write();
+            unsafe.write(false);
             unsafe.read();
         } catch (CancelledKeyException e) {
             // Because all 3 methods above may close the channel due to IOException.
@@ -266,10 +266,52 @@ public class NioSocketChannel extends AbstractNioChannel implements NioChannel  
         }
 
         @Override
-        public void write() {
+        public void write(boolean flush) {
             int readyOps = selectionKey.readyOps();
-            if ((readyOps & SelectionKey.OP_WRITE) != 0) {
+            if (flush || (readyOps & SelectionKey.OP_WRITE) != 0) {
+                try {
+                    var writeBehavior = workerConfig.getWriteBehavior();
+                    for (int i = 0; i < writeBehavior.getMaxWritePerLoop(); i++) {
+                        var buf = sendBuffer.remove();
+                        if (buf == null) {
+                            break;
+                        }
+                        // first write
+                        socketChannel.write(buf);
+                        if (buf.remaining() != 0) {
+                            boolean flushed = false;
+                            // spin write
+                            for (int j = 0; j < writeBehavior.getSpinCount(); j++) {
+                                socketChannel.write(buf);
+                                if (buf.remaining() == 0) {
+                                    flushed = true;
+                                    break;
+                                }
+                            }
+                            if (!flushed) {
+                                log.warn("TCP send buffer is full, wait util next event loop, address:{}",
+                                        socketChannel.getRemoteAddress());
+                                // add OP_WRITE to interest key
+                                selectionKey.interestOps(selectionKey.interestOps() | SelectionKey.OP_WRITE);
+                                sendBuffer.addFirst(buf);
+                                break; // don't continue to write the next ByteBuffer
+                            }
+                        }
+                    }
 
+                    if (sendBuffer.isEmpty()) {
+                        // All byte be sent, cancel the OP_WRITE
+                        selectionKey.interestOps(selectionKey.interestOps() & ~SelectionKey.OP_WRITE);
+                    }
+
+                    // edge trigger channelWritable()
+                    if (channelUnWritable && writeBehavior.getLowWatermark() >= sendBuffer.unsentBytes()) {
+                        channelUnWritable = false;
+                        pipeline.fireChannelWritable();
+                    }
+                } catch (IOException e) {
+                    unsafe.close();
+                }
             }
         }
 
@@ -311,40 +353,7 @@ public class NioSocketChannel extends AbstractNioChannel implements NioChannel  
 
         @Override
         public CompletableFuture<Void> flush(ChannelHandlerContext ctx) {
-            try {
-                var writeBehavior = workerConfig.getWriteBehavior();
-                for (int i = 0; i < writeBehavior.getMaxWritePerLoop(); i++) {
-                    var buf = sendBuffer.remove();
-                    if (buf == null) {
-                        break;
-                    }
-                    // first write
-                    socketChannel.write(buf);
-                    if (buf.remaining() != 0) {
-                        boolean flushed = false;
-                        // spin write
-                        for (int j = 0; j < writeBehavior.getSpinCount(); j++) {
-                            socketChannel.write(buf);
-                            if (buf.remaining() == 0) {
-                                flushed = true;
-                                break;
-                            }
-                        }
-                        if (!flushed) {
-                            sendBuffer.addFirst(buf);
-                            break; // don't continue to write the next ByteBuffer
-                        }
-                    }
-                }
-
-                // edge trigger channelWritable()
-                if (channelUnWritable && writeBehavior.getLowWatermark() >= sendBuffer.unsentBytes()) {
-                    channelUnWritable = false;
-                    pipeline.fireChannelWritable();
-                }
-            } catch (IOException e) {
-                unsafe.close();
-            }
+            unsafe.write(true);
             return CompletableFuture.completedFuture(null);
         }
 
@@ -391,6 +400,10 @@ public class NioSocketChannel extends AbstractNioChannel implements NioChannel  
                 unsentBytes -= buf.remaining();
             }
             return buf;
+        }
+
+        public boolean isEmpty() {
+            return unsentBytes == 0;
         }
 
         public int size() {
