@@ -25,13 +25,13 @@ public class BodyReader {
         var dupSrc = src.duplicate()
                 .position(src.position())
                 .limit(srcRemaining > remaining ? src.position() + remaining : src.limit());
+        // copy
         fixLengthBodyBuf.put(dupSrc);
-        if (fixLengthBodyBuf.remaining() != 0) {
-            return null;
-        }
-
         // update src pos
         src.position(dupSrc.position());
+        if (fixLengthBodyBuf.hasRemaining()) {
+            return null;
+        }
 
         // read completed
         fixLengthBodyBuf.flip();

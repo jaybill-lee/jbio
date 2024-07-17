@@ -1,5 +1,6 @@
 package org.jaybill.jbio.http;
 
+import lombok.extern.slf4j.Slf4j;
 import org.jaybill.jbio.core.ByteBufferAllocator;
 import org.jaybill.jbio.http.ex.HttpProtocolException;
 
@@ -7,6 +8,7 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.function.Consumer;
 
+@Slf4j
 public class HttpServerCodec implements HttpCodec<HttpResponse> {
 
     enum State {
@@ -45,21 +47,19 @@ public class HttpServerCodec implements HttpCodec<HttpResponse> {
     public void decode(ByteBuffer buf, Consumer<HttpDecodeEvent> consumer) {
         try {
             while (buf.hasRemaining()) {
-                buf.mark();
-                byte b = buf.get();
                 switch (state) {
-                    case SKIP_SPACE -> skipSpace(b, buf);
-                    case READ_METHOD -> readMethod(b, consumer);
-                    case READ_PATH -> readPath(b, consumer);
-                    case READ_VERSION -> readVer(b, buf, consumer);
-                    case READ_HEADERS -> readHeaders(b, buf, consumer);
+                    case SKIP_SPACE -> skipSpace(buf);
+                    case READ_METHOD -> readMethod(buf, consumer);
+                    case READ_PATH -> readPath(buf, consumer);
+                    case READ_VERSION -> readVer(buf, consumer);
+                    case READ_HEADERS -> readHeaders(buf, consumer);
                     case READ_BODY -> readBody(buf, consumer);
                 }
             }
         } catch (HttpProtocolException e) {
             throw e;
         } catch (Exception e) {
-            throw new HttpProtocolException();
+            throw new HttpProtocolException(e);
         }
     }
 
@@ -95,14 +95,17 @@ public class HttpServerCodec implements HttpCodec<HttpResponse> {
         return buf;
     }
 
-    private void skipSpace(byte b, ByteBuffer buf) {
+    private void skipSpace(ByteBuffer buf) {
+        buf.mark();
+        byte b = buf.get();
         if (b != ' ') {
             state = stateAfterSP;
             buf.reset(); // to last position
         }
     }
 
-    private void readMethod(byte b, Consumer<HttpDecodeEvent> consumer) {
+    private void readMethod(ByteBuffer buf, Consumer<HttpDecodeEvent> consumer) {
+        byte b = buf.get();
         if (reqLineBufIndex == 0) {
             if (b != 'G' && b != 'P' && b != 'D') {
                 throw new HttpProtocolException();
@@ -154,7 +157,8 @@ public class HttpServerCodec implements HttpCodec<HttpResponse> {
         }
     }
 
-    private void readPath(byte b, Consumer<HttpDecodeEvent> consumer) {
+    private void readPath(ByteBuffer buf, Consumer<HttpDecodeEvent> consumer) {
+        byte b = buf.get();
         if (b != ' ') {
             pathBuilder.append((char) b);
         } else {
@@ -165,7 +169,9 @@ public class HttpServerCodec implements HttpCodec<HttpResponse> {
         }
     }
 
-    private void readHeaders(byte b, ByteBuffer buf, Consumer<HttpDecodeEvent> consumer) {
+    private void readHeaders(ByteBuffer buf, Consumer<HttpDecodeEvent> consumer) {
+        buf.mark();
+        byte b = buf.get();
         var headers = headerCodec.readHeaders(b, buf);
         if (headers != null) {
             consumer.accept(new HttpDecodeEvent(HttpDecodeEvent.Type.HEADERS, headers));
@@ -181,7 +187,6 @@ public class HttpServerCodec implements HttpCodec<HttpResponse> {
     }
 
     private void readBody(ByteBuffer buf, Consumer<HttpDecodeEvent> consumer) {
-        buf.reset();
         var buffers = bodyReader.readFixLengthBody(buf);
         if (buffers != null) {
             consumer.accept(new HttpDecodeEvent(HttpDecodeEvent.Type.BODY, buffers));
@@ -190,7 +195,9 @@ public class HttpServerCodec implements HttpCodec<HttpResponse> {
         }
     }
 
-    private void readVer(byte b, ByteBuffer buf, Consumer<HttpDecodeEvent> consumer) {
+    private void readVer(ByteBuffer buf, Consumer<HttpDecodeEvent> consumer) {
+        buf.mark();
+        byte b = buf.get();
         switch (reqLineBufIndex) {
             case 0 -> decodeChar(b, 'H');
             case 1, 2 -> decodeChar(b, 'T');

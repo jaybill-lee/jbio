@@ -27,6 +27,11 @@ public class DefaultChannelHandlerContext implements ChannelHandlerContext {
     }
 
     @Override
+    public EventLoop eventloop() {
+        return eventLoop;
+    }
+
+    @Override
     public void fireChannelInitialized() {
         this.doInvokeInbound(ChannelInboundHandler::channelInitialized);
     }

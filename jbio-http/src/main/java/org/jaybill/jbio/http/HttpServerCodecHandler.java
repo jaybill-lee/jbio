@@ -8,18 +8,39 @@ import org.jaybill.jbio.http.ex.HttpProtocolException;
 import java.nio.ByteBuffer;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 @Slf4j
 public class HttpServerCodecHandler extends DefaultChannelDuplexHandler {
 
+    public static final int DEFAULT_MAX_BODY_SIZE = 65535; // bytes
+    public static final int DEFAULT_DECODE_TIMEOUT_SEC = 15;
+
+    // control properties
+    private final int maxBodySize;
+    private final int decodeTimeoutSec;
+    private CompletableFuture<?> decodeTimeoutFuture;
+
+    // internal set
     private int requestId = 0; // the first one can use id
     private HttpRequest decodingRequest;
+    private HttpServerCodec codec;
     private final Queue<Integer> requestIdQueue = new ArrayDeque<>();
     private final Map<Integer, HttpResponse> waitForFlushResponseMap = new HashMap<>();
-    private HttpServerCodec codec;
 
-    public HttpServerCodecHandler() {}
+    public HttpServerCodecHandler() {
+        this(DEFAULT_MAX_BODY_SIZE, DEFAULT_DECODE_TIMEOUT_SEC);
+    }
+
+    public HttpServerCodecHandler(int maxBodySize) {
+        this(maxBodySize, DEFAULT_DECODE_TIMEOUT_SEC);
+    }
+
+    public HttpServerCodecHandler(int maxBodySize, int decodeTimeoutSec) {
+        this.maxBodySize = maxBodySize;
+        this.decodeTimeoutSec = decodeTimeoutSec;
+    }
 
     @Override
     public void channelInitialized(ChannelHandlerContext ctx) {
@@ -40,6 +61,14 @@ public class HttpServerCodecHandler extends DefaultChannelDuplexHandler {
             codec.decode(buf, (evt) -> {
                 if (decodingRequest == null) {
                     decodingRequest = new HttpRequest();
+
+                    // Detect whether decoding for this request has timed out.
+                    // If the timeout is exceeded and not completed, close the TCP connection.
+                    // This helps prevent resource wastage caused by malicious requests.
+                    decodeTimeoutFuture = ctx.eventloop().scheduleTask(() -> {
+                        log.error("HTTP request decode timeout:{}", decodeTimeoutSec);
+                        ctx.channel().pipeline().fireChannelClose();
+                    }, decodeTimeoutSec, TimeUnit.SECONDS);
                 }
 
                 switch (evt.getType()) {
@@ -49,6 +78,11 @@ public class HttpServerCodecHandler extends DefaultChannelDuplexHandler {
                     case HEADERS -> decodingRequest.setHeaders((Map<String, String>) evt.getResult());
                     case BODY -> decodingRequest.setBody((Queue<ByteBuffer>) evt.getResult());
                     case END -> {
+                        log.debug("HTTP request decode end, id:{}", requestId);
+                        // cancel to prevent the channel be closed
+                        decodeTimeoutFuture.cancel(false);
+                        decodeTimeoutFuture = null;
+
                         int id = requestId++;
                         var resp = new HttpResponse();
                         resp.requestId(id);
@@ -59,6 +93,7 @@ public class HttpServerCodecHandler extends DefaultChannelDuplexHandler {
                 }
             });
         } catch (HttpProtocolException e) {
+            log.error("HTTP request decode error: ", e);
             // close channel
             ctx.channel().pipeline().fireChannelClose();
         }

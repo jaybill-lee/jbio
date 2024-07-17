@@ -2,6 +2,7 @@ package org.jaybill.jbio.core;
 
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 
 public interface EventLoop {
 
@@ -18,6 +19,14 @@ public interface EventLoop {
      * @throws TaskExecutionException if callable throw exception
      */
     <T> CompletableFuture<T> submitTask(Callable<T> c);
+
+    /**
+     * schedule task
+     * @param r runnable
+     * @param delay delay
+     * @param unit time unit
+     */
+    CompletableFuture<?> scheduleTask(Runnable r, int delay, TimeUnit unit);
 
     /**
      * close eventloop

@@ -7,6 +7,7 @@ import org.jaybill.jbio.http.GeneralStatusCode;
 import org.jaybill.jbio.http.HttpPair;
 import org.jaybill.jbio.http.HttpVersion;
 
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CompletableFuture;
 
@@ -18,6 +19,7 @@ public class SimpleHttpServerHandler extends DefaultChannelDuplexHandler {
         var pair = (HttpPair) o;
         var req = pair.getRequest();
         log.debug("Receive -> {}", req);
+        log.debug("        -> {}", toStr(req.getBody().peek()));
 
         var respBody = "Hi, I received the request:" + req.getPath();
         var resp = pair.getResponse();
@@ -33,5 +35,13 @@ public class SimpleHttpServerHandler extends DefaultChannelDuplexHandler {
         log.debug("Send -> {}", o);
         ctx.fireChannelWriteAndFlush(o);
         return null;
+    }
+
+    private String toStr(ByteBuffer buffer) {
+        var sb = new StringBuilder();
+        while (buffer.hasRemaining()) {
+            sb.append((char) buffer.get());
+        }
+        return sb.toString();
     }
 }

@@ -1,5 +1,8 @@
 package org.jaybill.jbio.core;
 
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.extern.slf4j.Slf4j;
 import org.jctools.queues.MpscArrayQueue;
 
 import java.io.IOException;
@@ -8,15 +11,19 @@ import java.nio.channels.spi.SelectorProvider;
 import java.util.Queue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.PriorityBlockingQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
+@Slf4j
 public class NioEventLoop implements EventLoop, Runnable {
 
     private static final AtomicInteger COUNTER = new AtomicInteger(0);
 
     private final AtomicBoolean started;
     private Thread thread;
+    private PriorityBlockingQueue<DelayTask<?>> delayTaskQueue;
     private Queue<Runnable> taskQueue;
     private Selector selector;
     private SelectorProvider provider;
@@ -26,6 +33,7 @@ public class NioEventLoop implements EventLoop, Runnable {
         this.started = new AtomicBoolean(false);
         this.thread = new Thread(this, namePrefix + COUNTER.getAndAdd(1));
         this.taskQueue = new MpscArrayQueue<>(16);
+        this.delayTaskQueue = new PriorityBlockingQueue<>();
         try {
             this.selector = provider.openSelector();
         } catch (IOException e) {
@@ -71,6 +79,13 @@ public class NioEventLoop implements EventLoop, Runnable {
     }
 
     @Override
+    public CompletableFuture<?> scheduleTask(Runnable r, int delay, TimeUnit unit) {
+        var future = new CompletableFuture<>();
+        delayTaskQueue.offer(new DelayTask<>(r, System.nanoTime() + unit.toNanos(delay), future));
+        return future;
+    }
+
+    @Override
     public void close() {
 
     }
@@ -79,7 +94,37 @@ public class NioEventLoop implements EventLoop, Runnable {
     public void run() {
         for (;;) {
             try {
-                int n = selector.select();
+                long selectTimeout = Long.MAX_VALUE;
+                // 0. process delay task
+                DelayTask<?> delayTask;
+                while ((delayTask = delayTaskQueue.peek()) != null) {
+                    selectTimeout = (delayTask.executeTime - System.nanoTime()) / (1000 * 1000);
+                    if (selectTimeout <= 0) {
+                        // remove task
+                        delayTaskQueue.remove();
+                        // if task be cancelled, continue next
+                        if (delayTask.future.isCancelled()) {
+                            continue;
+                        }
+                        try {
+                            delayTask.r.run();
+                        } catch (Throwable e) {
+                            log.error("run delay task e:", e);
+                        } finally {
+                            delayTask.future.complete(null);
+                        }
+                    } else {
+                        break;
+                    }
+                }
+
+                // 1. process io event
+                int n;
+                if (selectTimeout <= 0) {
+                    n = selector.selectNow();
+                } else {
+                    n = selector.select(selectTimeout);
+                }
                 if (n != 0) {
                     var keys = selector.selectedKeys();
                     var it = keys.iterator();
@@ -92,6 +137,8 @@ public class NioEventLoop implements EventLoop, Runnable {
                         }
                     }
                 }
+
+                // 2. process task
                 Runnable task;
                 while ((task = taskQueue.poll()) != null) {
                     task.run();
@@ -100,6 +147,27 @@ public class NioEventLoop implements EventLoop, Runnable {
                 e.printStackTrace();
             } catch (Throwable e) {
                 e.printStackTrace();
+            }
+        }
+    }
+
+    @Getter
+    @AllArgsConstructor
+    public static class DelayTask<T> implements Comparable<DelayTask<T>> {
+        private Runnable r;
+        private long executeTime;
+        private CompletableFuture<T> future;
+
+        @Override
+        public int compareTo(DelayTask<T> o) {
+            // small first
+            long x = this.executeTime - o.executeTime;
+            if (x < 0) {
+                return -1;
+            } else if (x == 0){
+                return 0;
+            } else {
+                return 1;
             }
         }
     }
