@@ -17,10 +17,15 @@ public class HttpServerCodecHandler extends DefaultChannelDuplexHandler {
     private HttpRequest decodingRequest;
     private final Queue<Integer> requestIdQueue = new ArrayDeque<>();
     private final Map<Integer, HttpResponse> waitForFlushResponseMap = new HashMap<>();
-    private final HttpServerCodec codec;
+    private HttpServerCodec codec;
 
-    public HttpServerCodecHandler() {
-        this.codec = new HttpServerCodec();
+    public HttpServerCodecHandler() {}
+
+    @Override
+    public void channelInitialized(ChannelHandlerContext ctx) {
+        // create the codec when channel is initialized
+        this.codec = new HttpServerCodec(ctx.channel().allocator());
+        ctx.fireChannelInitialized();
     }
 
     @Override

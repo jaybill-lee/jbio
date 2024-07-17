@@ -35,10 +35,12 @@ public class HttpClientCodec implements HttpCodec<HttpRequest> {
     private final HeaderCodec headerCodec;
 
     // body
+    private final ByteBufferAllocator allocator;
     private BodyReader bodyReader = null;
 
-    public HttpClientCodec() {
+    public HttpClientCodec(ByteBufferAllocator allocator) {
         this.headerCodec = new HeaderCodec();
+        this.allocator = allocator;
     }
 
     @Override
@@ -135,16 +137,23 @@ public class HttpClientCodec implements HttpCodec<HttpRequest> {
         var headers = headerCodec.readHeaders(b, buf);
         if (headers != null) {
             consumer.accept(new HttpDecodeEvent(HttpDecodeEvent.Type.HEADERS, headers));
-            bodyReader = new BodyReader(GeneralHttpHeader.getContentLength(headers));
-            state = State.READ_BODY;
+            int length = GeneralHttpHeader.getContentLength(headers);
+            if (length == 0) {
+                consumer.accept(new HttpDecodeEvent(HttpDecodeEvent.Type.END, null));
+                reuse();
+            } else {
+                bodyReader = new BodyReader(allocator.allocate(length));
+                state = State.READ_BODY;
+            }
         }
     }
 
     private void readBody(ByteBuffer buf, Consumer<HttpDecodeEvent> consumer) {
         buf.reset();
-        var buffers = bodyReader.readBody(buf);
+        var buffers = bodyReader.readFixLengthBody(buf);
         if (buffers != null) {
             consumer.accept(new HttpDecodeEvent(HttpDecodeEvent.Type.BODY, buffers));
+            consumer.accept(new HttpDecodeEvent(HttpDecodeEvent.Type.END, null));
             reuse();
         }
     }

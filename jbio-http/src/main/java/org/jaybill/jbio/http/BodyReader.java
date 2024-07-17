@@ -6,47 +6,31 @@ import java.util.Deque;
 
 public class BodyReader {
 
-    private final Deque<ByteBuffer> buffers;
-    private final int expectLen;
-    private int currentLen;
+    private final Deque<ByteBuffer> buffers; // for trunk
+    private final ByteBuffer fixLengthBodyBuf; // for content-length body
 
-    BodyReader(int expectLen) {
+    BodyReader(ByteBuffer fixLengthBodyBuf) {
         this.buffers = new ArrayDeque<>();
-        this.expectLen = expectLen;
+        this.fixLengthBodyBuf = fixLengthBodyBuf;
     }
 
     /**
-     * read body
-     * @param buf
+     * read fix length body to a new buffer
+     * @param src
      * @return not null if read completed
      */
-    Deque<ByteBuffer> readBody(ByteBuffer buf) {
-        if (currentLen < expectLen) {
-            int len = currentLen + buf.remaining();
-            if (len > expectLen) {
-                int newLimit = buf.position() + (expectLen - currentLen);
-                var newBuf = buf.duplicate();
-                newBuf.position(buf.position());
-                newBuf.limit(newLimit);
-                buf.position(newLimit);
-                currentLen = expectLen;
-                buffers.add(newBuf);
-                return buffers;
-            } else {
-                var limit = buf.limit();
-                var newBuf = buf.duplicate();
-                newBuf.position(buf.position());
-                newBuf.limit(limit);
-                buf.position(limit);
-                currentLen = len;
-                buffers.add(newBuf);
-                if (currentLen == expectLen) {
-                    return buffers;
-                }
-            }
-        } else {
-            return buffers;
+    Deque<ByteBuffer> readFixLengthBody(ByteBuffer src) {
+        var remaining = fixLengthBodyBuf.remaining();
+        var srcRemaining = src.remaining();
+        fixLengthBodyBuf.put(src.duplicate()
+                .position(src.position())
+                .limit(srcRemaining > remaining ? src.position() + remaining : src.limit()));
+        if (fixLengthBodyBuf.remaining() != 0) {
+            return null;
         }
-        return null;
+
+        // read completed
+        buffers.add(fixLengthBodyBuf);
+        return buffers;
     }
 }

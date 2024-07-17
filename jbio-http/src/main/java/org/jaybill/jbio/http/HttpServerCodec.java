@@ -33,10 +33,12 @@ public class HttpServerCodec implements HttpCodec<HttpResponse> {
     private final HeaderCodec headerCodec;
 
     // body
+    private final ByteBufferAllocator allocator;
     private BodyReader bodyReader = null;
 
-    public HttpServerCodec() {
+    public HttpServerCodec(ByteBufferAllocator allocator) {
         this.headerCodec = new HeaderCodec();
+        this.allocator = allocator;
     }
 
     @Override
@@ -172,7 +174,7 @@ public class HttpServerCodec implements HttpCodec<HttpResponse> {
                 consumer.accept(new HttpDecodeEvent(HttpDecodeEvent.Type.END, null));
                 reuse();
             } else {
-                bodyReader = new BodyReader(length);
+                bodyReader = new BodyReader(allocator.allocate(length));
                 state = State.READ_BODY;
             }
         }
@@ -180,7 +182,7 @@ public class HttpServerCodec implements HttpCodec<HttpResponse> {
 
     private void readBody(ByteBuffer buf, Consumer<HttpDecodeEvent> consumer) {
         buf.reset();
-        var buffers = bodyReader.readBody(buf);
+        var buffers = bodyReader.readFixLengthBody(buf);
         if (buffers != null) {
             consumer.accept(new HttpDecodeEvent(HttpDecodeEvent.Type.BODY, buffers));
             consumer.accept(new HttpDecodeEvent(HttpDecodeEvent.Type.END, null));
