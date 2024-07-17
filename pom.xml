@@ -11,6 +11,8 @@
     <modules>
         <module>jbio-core</module>
         <module>jbio-http</module>
+        <module>jbio-example</module>
+        <module>jbio-all</module>
     </modules>
 
     <properties>
@@ -51,6 +53,15 @@
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>ch.qos.logback</groupId>
+            <artifactId>logback-classic</artifactId>
         </dependency>
     </dependencies>
 

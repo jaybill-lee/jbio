@@ -9,7 +9,7 @@
         <version>${revision}</version>
     </parent>
 
-    <artifactId>jbio-core</artifactId>
+    <artifactId>jbio-all</artifactId>
 
     <properties>
         <maven.compiler.source>21</maven.compiler.source>
@@ -19,8 +19,15 @@
 
     <dependencies>
         <dependency>
-            <groupId>org.jctools</groupId>
-            <artifactId>jctools-core</artifactId>
+            <groupId>org.jaybill</groupId>
+            <artifactId>jbio-core</artifactId>
+            <version>${revision}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.jaybill</groupId>
+            <artifactId>jbio-http</artifactId>
+            <version>${revision}</version>
         </dependency>
     </dependencies>
+
 </project>
