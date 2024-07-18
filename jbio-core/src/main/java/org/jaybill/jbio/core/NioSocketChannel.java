@@ -313,8 +313,6 @@ public class NioSocketChannel extends AbstractNioChannel implements NioChannel  
                         if (!drainAll) {
                             log.warn("TCP send buffer is full, wait util next event loop, address:{}",
                                     socketChannel.getRemoteAddress());
-                            // add OP_WRITE to interest key
-                            selectionKey.interestOps(selectionKey.interestOps() | SelectionKey.OP_WRITE);
                             // return to SendBuffer instance
                             for (int i = pair.right() - 1; i >= pair.left(); i--) {
                                 sendBuffer.addFirst(waitForSendBufArray[i]);
@@ -325,6 +323,9 @@ public class NioSocketChannel extends AbstractNioChannel implements NioChannel  
                     if (sendBuffer.isEmpty()) {
                         // All byte be sent, cancel the OP_WRITE
                         selectionKey.interestOps(selectionKey.interestOps() & ~SelectionKey.OP_WRITE);
+                    } else {
+                        // add OP_WRITE to interest key
+                        selectionKey.interestOps(selectionKey.interestOps() | SelectionKey.OP_WRITE);
                     }
 
                     // edge trigger channelWritable()
