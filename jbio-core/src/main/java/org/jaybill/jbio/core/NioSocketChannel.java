@@ -1,6 +1,8 @@
 package org.jaybill.jbio.core;
 
 import lombok.extern.slf4j.Slf4j;
+import org.jaybill.jbio.core.util.Pair;
+
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.StandardSocketOptions;
@@ -207,8 +209,20 @@ public class NioSocketChannel extends AbstractNioChannel implements NioChannel  
         @Override
         public void close() {
             ChannelUtil.forceClose(socketChannel);
-            pipeline.fireChannelDeregistered();
-            pipeline.fireChannelClosed();
+            // only fire once
+            if (state.get() != CLOSED) {
+                try {
+                    pipeline.fireChannelDeregistered();
+                } catch (Throwable e) {
+                    log.error("fireChannelDeregistered error:", e);
+                }
+                try {
+                    pipeline.fireChannelClosed();
+                } catch (Throwable e) {
+                    log.error("fireChannelClosed error:", e);
+                }
+                state.set(CLOSED);
+            }
         }
 
         @Override
@@ -242,12 +256,11 @@ public class NioSocketChannel extends AbstractNioChannel implements NioChannel  
                         int available = buf.remaining();
                         int c = socketChannel.read(buf);
                         if (c == -1) {
-                            socketChannel.close();
-                            pipeline.fireChannelDeregistered();
-                            pipeline.fireChannelClosed();
+                            this.close();
                             break;
                         } else if (c == 0) {
                             // release buf
+                            log.debug("read length is 0");
                             break;
                         } else if (c > 0) {
                             buf.flip();
@@ -260,6 +273,7 @@ public class NioSocketChannel extends AbstractNioChannel implements NioChannel  
                 } catch (IOException e) {
                     this.close();
                 } catch (Throwable e) {
+                    log.error("occur throwable when reading:", e);
                     pipeline.fireChannelException(e);
                 }
             }
@@ -271,30 +285,43 @@ public class NioSocketChannel extends AbstractNioChannel implements NioChannel  
             if (flush || (readyOps & SelectionKey.OP_WRITE) != 0) {
                 try {
                     var writeBehavior = workerConfig.getWriteBehavior();
-                    for (int i = 0; i < writeBehavior.getMaxWritePerLoop(); i++) {
+                    var maxWritePerLoop = writeBehavior.getMaxBufferNumPerWrite();
+                    ByteBuffer[] waitForSendBufArray = new ByteBuffer[Math.min(maxWritePerLoop, sendBuffer.size())];
+
+                    // collect to an array
+                    for (int i = 0; i < maxWritePerLoop; i++) {
                         var buf = sendBuffer.remove();
                         if (buf == null) {
                             break;
                         }
-                        // first write
-                        socketChannel.write(buf);
-                        if (buf.remaining() != 0) {
-                            boolean flushed = false;
-                            // spin write
-                            for (int j = 0; j < writeBehavior.getSpinCount(); j++) {
-                                socketChannel.write(buf);
-                                if (buf.remaining() == 0) {
-                                    flushed = true;
-                                    break;
-                                }
+                        waitForSendBufArray[i] = buf;
+                    }
+
+                    // first write
+                    socketChannel.write(waitForSendBufArray, 0, waitForSendBufArray.length);
+
+                    // Check the writing progress.
+                    // Because it is possible that not all writes were made due to the TCP send buffer being full.
+                    var pair = this.checkWriteProcess(waitForSendBufArray);
+                    if (pair != null) {
+                        boolean drainAll = false;
+                        // spin write
+                        for (int j = 0; j < writeBehavior.getSpinCount(); j++) {
+                            socketChannel.write(waitForSendBufArray, pair.left(), pair.right());
+                            pair = this.checkWriteProcess(waitForSendBufArray);
+                            if (pair == null) {
+                                drainAll = true;
+                                break;
                             }
-                            if (!flushed) {
-                                log.warn("TCP send buffer is full, wait util next event loop, address:{}",
-                                        socketChannel.getRemoteAddress());
-                                // add OP_WRITE to interest key
-                                selectionKey.interestOps(selectionKey.interestOps() | SelectionKey.OP_WRITE);
-                                sendBuffer.addFirst(buf);
-                                break; // don't continue to write the next ByteBuffer
+                        }
+                        if (!drainAll) {
+                            log.warn("TCP send buffer is full, wait util next event loop, address:{}",
+                                    socketChannel.getRemoteAddress());
+                            // add OP_WRITE to interest key
+                            selectionKey.interestOps(selectionKey.interestOps() | SelectionKey.OP_WRITE);
+                            // return to SendBuffer instance
+                            for (int i = pair.right() - 1; i >= pair.left(); i--) {
+                                sendBuffer.addFirst(waitForSendBufArray[i]);
                             }
                         }
                     }
@@ -310,7 +337,7 @@ public class NioSocketChannel extends AbstractNioChannel implements NioChannel  
                         pipeline.fireChannelWritable();
                     }
                 } catch (IOException e) {
-                    unsafe.close();
+                    this.close();
                 }
             }
         }
@@ -329,6 +356,25 @@ public class NioSocketChannel extends AbstractNioChannel implements NioChannel  
             } else if (k == SocketOption.SO_REUSEADDR) {
                 socketChannel.setOption(StandardSocketOptions.SO_REUSEADDR, (boolean) v);
             }
+        }
+
+        // If everything has been written, return null.
+        private Pair<Integer, Integer> checkWriteProcess(ByteBuffer[] srcs) {
+            Integer left = null;
+            // We assume that in the vast majority of cases everything can be sent in its entirety,
+            // so we attempt to find the first incomplete transmission from the end to the beginning.
+            for (int i = srcs.length - 1; i >= 0; i--) {
+                var buf = srcs[i];
+                if (!buf.hasRemaining()) {
+                    break;
+                } else {
+                    left = i;
+                }
+            }
+            if (left != null) {
+                return Pair.of(left, srcs.length);
+            }
+            return null;
         }
     }
 

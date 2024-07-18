@@ -111,6 +111,7 @@ public class NioEventLoop implements EventLoop, Runnable {
                         } catch (Throwable e) {
                             log.error("run delay task e:", e);
                         } finally {
+                            // ignore exception
                             delayTask.future.complete(null);
                         }
                     } else {
@@ -143,10 +144,10 @@ public class NioEventLoop implements EventLoop, Runnable {
                 while ((task = taskQueue.poll()) != null) {
                     task.run();
                 }
-            } catch (IOException e) {
-                e.printStackTrace();
             } catch (Throwable e) {
-                e.printStackTrace();
+                log.error("eventloop occur error:", e);
+            } finally {
+                // do some check
             }
         }
     }

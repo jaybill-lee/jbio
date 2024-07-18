@@ -16,7 +16,7 @@ public class NioSocketChannelConfigTemplate extends NioChannelConfigTemplate {
 
     // write behavior
     private int spinCount;
-    private int maxWritePerLoop;
+    private int maxBufferNumPerWrite;
     private int highWatermark;
     private int lowWatermark;
 
@@ -31,7 +31,7 @@ public class NioSocketChannelConfigTemplate extends NioChannelConfigTemplate {
 
         // write
         DEFAULT.setSpinCount(100);
-        DEFAULT.setMaxWritePerLoop(100);
+        DEFAULT.setMaxBufferNumPerWrite(100);
         DEFAULT.setHighWatermark(1024 * 1024 * 16);
         DEFAULT.setLowWatermark(1024 * 1024 * 8);
     }
@@ -72,7 +72,7 @@ public class NioSocketChannelConfigTemplate extends NioChannelConfigTemplate {
         // write behavior
         var writeBehavior = new WriteBehavior();
         writeBehavior.setSpinCount(spinCount);
-        writeBehavior.setMaxWritePerLoop(maxWritePerLoop);
+        writeBehavior.setMaxBufferNumPerWrite(maxBufferNumPerWrite);
         writeBehavior.setLowWatermark(lowWatermark);
         writeBehavior.setHighWatermark(highWatermark);
         config.setWriteBehavior(writeBehavior);
