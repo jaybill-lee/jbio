@@ -285,16 +285,12 @@ public class NioSocketChannel extends AbstractNioChannel implements NioChannel  
             if (flush || (readyOps & SelectionKey.OP_WRITE) != 0) {
                 try {
                     var writeBehavior = workerConfig.getWriteBehavior();
-                    var maxWritePerLoop = writeBehavior.getMaxBufferNumPerWrite();
-                    ByteBuffer[] waitForSendBufArray = new ByteBuffer[Math.min(maxWritePerLoop, sendBuffer.size())];
+                    var maxBufferNum = writeBehavior.getMaxBufferNumPerWrite();
+                    ByteBuffer[] waitForSendBufArray = new ByteBuffer[Math.min(maxBufferNum, sendBuffer.size())];
 
                     // collect to an array
-                    for (int i = 0; i < maxWritePerLoop; i++) {
-                        var buf = sendBuffer.remove();
-                        if (buf == null) {
-                            break;
-                        }
-                        waitForSendBufArray[i] = buf;
+                    for (int i = 0; i < waitForSendBufArray.length; i++) {
+                        waitForSendBufArray[i] = sendBuffer.remove();
                     }
 
                     // first write
