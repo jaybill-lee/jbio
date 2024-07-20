@@ -18,6 +18,11 @@ public class DefaultChannelDuplexHandler implements ChannelInboundHandler, Chann
     }
 
     @Override
+    public void channelConnected(ChannelHandlerContext ctx) {
+        ctx.fireChannelConnected();
+    }
+
+    @Override
     public void channelDeregistered(ChannelHandlerContext ctx) {
         ctx.fireChannelDeregistered();
     }

@@ -5,6 +5,7 @@ public interface ChannelHandlerInvoker {
     void fireChannelInitialized();
     void fireChannelBound();
     void fireChannelRegistered();
+    void fireChannelConnected();
     void fireChannelRead(Object o);
     void fireChannelClosed();
     void fireChannelDeregistered();

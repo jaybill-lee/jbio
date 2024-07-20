@@ -8,6 +8,8 @@ public interface ChannelInboundHandler extends ChannelHandler {
 
     void channelRegistered(ChannelHandlerContext ctx);
 
+    void channelConnected(ChannelHandlerContext ctx);
+
     void channelDeregistered(ChannelHandlerContext ctx);
 
     void channelSendBufferFull(ChannelHandlerContext ctx);

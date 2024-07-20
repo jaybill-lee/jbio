@@ -76,6 +76,11 @@ public class DefaultChannelPipeline implements ChannelPipeline {
     }
 
     @Override
+    public void fireChannelConnected() {
+        ((ChannelInboundHandler) head.handler()).channelConnected(head);
+    }
+
+    @Override
     public void fireChannelRead(Object o) {
         ((ChannelInboundHandler) head.handler()).channelRead(head, o);
     }

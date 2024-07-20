@@ -88,6 +88,11 @@ public class NioSocketChannelTest {
             }
 
             @Override
+            public void channelConnected(ChannelHandlerContext ctx) {
+                ctx.fireChannelConnected();
+            }
+
+            @Override
             public void channelDeregistered(ChannelHandlerContext ctx) {
                 deregisteredFuture.complete(counter.incrementAndGet());
                 ctx.fireChannelDeregistered();

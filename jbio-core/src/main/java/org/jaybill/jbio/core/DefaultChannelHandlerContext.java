@@ -61,6 +61,11 @@ public class DefaultChannelHandlerContext implements ChannelHandlerContext {
     }
 
     @Override
+    public void fireChannelConnected() {
+        this.doInvokeInbound(ChannelInboundHandler::channelConnected);
+    }
+
+    @Override
     public void fireChannelRead(Object o) {
         this.doInvokeInbound((handler, cur) -> handler.channelRead(cur, o));
     }
