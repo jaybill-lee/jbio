@@ -1,6 +1,5 @@
 package org.jaybill.jbio.core;
 
-import java.util.concurrent.CompletableFuture;
 import java.util.function.BiConsumer;
 
 public class DefaultChannelHandlerContext implements ChannelHandlerContext {
@@ -82,21 +81,18 @@ public class DefaultChannelHandlerContext implements ChannelHandlerContext {
     }
 
     @Override
-    public CompletableFuture<Void> fireChannelWrite(Object buf) {
+    public void fireChannelWrite(Object buf) {
         this.doInvokeOutbound((handler, ctx) -> handler.write(ctx, buf));
-        return null;
     }
 
     @Override
-    public CompletableFuture<Void> fireChannelFlush() {
+    public void fireChannelFlush() {
         this.doInvokeOutbound(ChannelOutboundHandler::flush);
-        return null;
     }
 
     @Override
-    public CompletableFuture<Void> fireChannelWriteAndFlush(Object buf) {
+    public void fireChannelWriteAndFlush(Object buf) {
         this.doInvokeOutbound((handler, ctx) -> handler.writeAndFlush(ctx, buf));
-        return null;
     }
 
     private void doInvokeInbound(BiConsumer<ChannelInboundHandler, DefaultChannelHandlerContext> consumer) {

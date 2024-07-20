@@ -1,7 +1,5 @@
 package org.jaybill.jbio.core;
 
-import java.util.concurrent.CompletableFuture;
-
 public class DefaultChannelDuplexHandler implements ChannelInboundHandler, ChannelOutboundHandler {
 
     @Override
@@ -55,17 +53,17 @@ public class DefaultChannelDuplexHandler implements ChannelInboundHandler, Chann
     }
 
     @Override
-    public CompletableFuture<Void> write(ChannelHandlerContext ctx, Object buf) {
-        return ctx.fireChannelWrite(buf);
+    public void write(ChannelHandlerContext ctx, Object buf) {
+        ctx.fireChannelWrite(buf);
     }
 
     @Override
-    public CompletableFuture<Void> flush(ChannelHandlerContext ctx) {
-        return ctx.fireChannelFlush();
+    public void flush(ChannelHandlerContext ctx) {
+        ctx.fireChannelFlush();
     }
 
     @Override
-    public CompletableFuture<Void> writeAndFlush(ChannelHandlerContext ctx, Object o) {
-        return ctx.fireChannelWriteAndFlush(o);
+    public void writeAndFlush(ChannelHandlerContext ctx, Object o) {
+        ctx.fireChannelWriteAndFlush(o);
     }
 }

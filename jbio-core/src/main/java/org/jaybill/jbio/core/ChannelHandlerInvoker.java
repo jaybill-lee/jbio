@@ -1,7 +1,5 @@
 package org.jaybill.jbio.core;
 
-import java.util.concurrent.CompletableFuture;
-
 public interface ChannelHandlerInvoker {
     // inbound event
     void fireChannelInitialized();
@@ -16,7 +14,7 @@ public interface ChannelHandlerInvoker {
 
     // outbound event
     void fireChannelClose();
-    CompletableFuture<Void> fireChannelWrite(Object o);
-    CompletableFuture<Void> fireChannelFlush();
-    CompletableFuture<Void> fireChannelWriteAndFlush(Object buf);
+    void fireChannelWrite(Object o);
+    void fireChannelFlush();
+    void fireChannelWriteAndFlush(Object buf);
 }

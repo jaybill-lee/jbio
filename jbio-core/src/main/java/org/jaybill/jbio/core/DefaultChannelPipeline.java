@@ -1,6 +1,5 @@
 package org.jaybill.jbio.core;
 
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -112,17 +111,17 @@ public class DefaultChannelPipeline implements ChannelPipeline {
     }
 
     @Override
-    public CompletableFuture<Void> fireChannelWrite(Object buf) {
-        return ((ChannelOutboundHandler) tail.handler()).write(tail, buf);
+    public void fireChannelWrite(Object buf) {
+        ((ChannelOutboundHandler) tail.handler()).write(tail, buf);
     }
 
     @Override
-    public CompletableFuture<Void> fireChannelFlush() {
-        return ((ChannelOutboundHandler) tail.handler()).flush(tail);
+    public void fireChannelFlush() {
+        ((ChannelOutboundHandler) tail.handler()).flush(tail);
     }
 
     @Override
-    public CompletableFuture<Void> fireChannelWriteAndFlush(Object buf) {
-        return ((ChannelOutboundHandler) tail.handler()).writeAndFlush(tail, buf);
+    public void fireChannelWriteAndFlush(Object buf) {
+        ((ChannelOutboundHandler) tail.handler()).writeAndFlush(tail, buf);
     }
 }

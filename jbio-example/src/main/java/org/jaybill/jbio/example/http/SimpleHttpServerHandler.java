@@ -9,7 +9,6 @@ import org.jaybill.jbio.http.HttpVersion;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
-import java.util.concurrent.CompletableFuture;
 
 @Slf4j
 public class SimpleHttpServerHandler extends DefaultChannelDuplexHandler {
@@ -31,10 +30,9 @@ public class SimpleHttpServerHandler extends DefaultChannelDuplexHandler {
     }
 
     @Override
-    public CompletableFuture<Void> writeAndFlush(ChannelHandlerContext ctx, Object o) {
+    public void writeAndFlush(ChannelHandlerContext ctx, Object o) {
         log.debug("Send -> {}", o);
         ctx.fireChannelWriteAndFlush(o);
-        return null;
     }
 
     private String toStr(ByteBuffer buffer) {

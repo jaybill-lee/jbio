@@ -105,16 +105,16 @@ public class HttpServerCodecHandler extends DefaultChannelDuplexHandler {
     }
 
     @Override
-    public CompletableFuture<Void> write(ChannelHandlerContext ctx, Object o) {
-        return doWrite(ctx, o, ctx::fireChannelWrite);
+    public void write(ChannelHandlerContext ctx, Object o) {
+        doWrite(ctx, o, ctx::fireChannelWrite);
     }
 
     @Override
-    public CompletableFuture<Void> writeAndFlush(ChannelHandlerContext ctx, Object o) {
-        return doWrite(ctx, o, ctx::fireChannelWriteAndFlush);
+    public void writeAndFlush(ChannelHandlerContext ctx, Object o) {
+        doWrite(ctx, o, ctx::fireChannelWriteAndFlush);
     }
 
-    private CompletableFuture<Void> doWrite(ChannelHandlerContext ctx, Object o, Consumer<ByteBuffer> consumer) {
+    private void doWrite(ChannelHandlerContext ctx, Object o, Consumer<ByteBuffer> consumer) {
         var resp = (HttpResponse) o;
         Integer id = resp.requestId();
 
@@ -145,6 +145,5 @@ public class HttpServerCodecHandler extends DefaultChannelDuplexHandler {
         } else {
             waitForFlushResponseMap.put(id, resp);
         }
-        return null;
     }
 }

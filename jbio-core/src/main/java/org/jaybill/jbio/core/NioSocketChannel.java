@@ -383,7 +383,7 @@ public class NioSocketChannel extends AbstractNioChannel implements NioChannel  
         }
 
         @Override
-        public CompletableFuture<Void> write(ChannelHandlerContext ctx, Object b) {
+        public void write(ChannelHandlerContext ctx, Object b) {
             var buf = (ByteBuffer) b;
             sendBuffer.add(buf);
             var writeBehavior = workerConfig.getWriteBehavior();
@@ -391,19 +391,17 @@ public class NioSocketChannel extends AbstractNioChannel implements NioChannel  
                 channelUnWritable = true;
                 pipeline.fireChannelUnWritable();
             }
-            return CompletableFuture.completedFuture(null);
         }
 
         @Override
-        public CompletableFuture<Void> flush(ChannelHandlerContext ctx) {
+        public void flush(ChannelHandlerContext ctx) {
             unsafe.write(true);
-            return CompletableFuture.completedFuture(null);
         }
 
         @Override
-        public CompletableFuture<Void> writeAndFlush(ChannelHandlerContext ctx, Object buf) {
+        public void writeAndFlush(ChannelHandlerContext ctx, Object buf) {
             this.write(ctx, buf);
-            return this.flush(ctx);
+            this.flush(ctx);
         }
     }
 
