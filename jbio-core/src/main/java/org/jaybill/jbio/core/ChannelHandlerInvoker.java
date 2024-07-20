@@ -11,6 +11,7 @@ public interface ChannelHandlerInvoker {
     void fireChannelException(Throwable t);
     void fireChannelUnWritable();
     void fireChannelWritable();
+    void fireSendChannelFull();
 
     // outbound event
     void fireChannelClose();

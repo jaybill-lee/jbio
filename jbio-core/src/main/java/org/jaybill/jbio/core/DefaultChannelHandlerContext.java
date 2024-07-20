@@ -91,6 +91,11 @@ public class DefaultChannelHandlerContext implements ChannelHandlerContext {
     }
 
     @Override
+    public void fireSendChannelFull() {
+        this.doInvokeInbound(ChannelInboundHandler::channelSendBufferFull);
+    }
+
+    @Override
     public void fireChannelClose() {
         this.doInvokeOutbound(ChannelOutboundHandler::close);
     }

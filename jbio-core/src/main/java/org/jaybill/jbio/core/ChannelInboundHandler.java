@@ -10,6 +10,8 @@ public interface ChannelInboundHandler extends ChannelHandler {
 
     void channelDeregistered(ChannelHandlerContext ctx);
 
+    void channelSendBufferFull(ChannelHandlerContext ctx);
+
     /**
      * When the number of bytes squeezed in SendBuffer is greater than or equals to {@link WriteBehavior#getHighWatermark()},
      * this method is triggered.
