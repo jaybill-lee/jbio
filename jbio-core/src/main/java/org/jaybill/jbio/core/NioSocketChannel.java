@@ -353,6 +353,8 @@ public class NioSocketChannel extends AbstractNioChannel implements NioChannel  
                 socketChannel.setOption(StandardSocketOptions.SO_RCVBUF, (int) v);
             } else if (k == SocketOption.SO_REUSEADDR) {
                 socketChannel.setOption(StandardSocketOptions.SO_REUSEADDR, (boolean) v);
+            } else if (k == SocketOption.SO_REUSE_PORT) {
+                socketChannel.setOption(StandardSocketOptions.SO_REUSEPORT, (boolean) v);
             }
         }
 
