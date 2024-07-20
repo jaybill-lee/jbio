@@ -4,9 +4,9 @@ public interface ChannelOutboundHandler extends ChannelHandler {
 
     void close(ChannelHandlerContext ctx);
 
-    void write(ChannelHandlerContext ctx, Object buf);
+    void write(ChannelHandlerContext ctx, Object o);
 
     void flush(ChannelHandlerContext ctx);
 
-    void writeAndFlush(ChannelHandlerContext ctx, Object buf);
+    void writeAndFlush(ChannelHandlerContext ctx, Object o);
 }

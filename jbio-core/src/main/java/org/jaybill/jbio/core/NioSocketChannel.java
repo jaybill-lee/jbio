@@ -387,7 +387,7 @@ public class NioSocketChannel extends AbstractNioChannel implements NioChannel  
             var buf = (ByteBuffer) b;
             sendBuffer.add(buf);
             var writeBehavior = workerConfig.getWriteBehavior();
-            if (writeBehavior.getHighWatermark() <= sendBuffer.unsentBytes()) {
+            if (!channelUnWritable && writeBehavior.getHighWatermark() <= sendBuffer.unsentBytes()) {
                 channelUnWritable = true;
                 pipeline.fireChannelUnWritable();
             }

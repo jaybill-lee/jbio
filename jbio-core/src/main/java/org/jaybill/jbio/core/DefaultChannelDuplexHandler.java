@@ -53,8 +53,8 @@ public class DefaultChannelDuplexHandler implements ChannelInboundHandler, Chann
     }
 
     @Override
-    public void write(ChannelHandlerContext ctx, Object buf) {
-        ctx.fireChannelWrite(buf);
+    public void write(ChannelHandlerContext ctx, Object o) {
+        ctx.fireChannelWrite(o);
     }
 
     @Override
