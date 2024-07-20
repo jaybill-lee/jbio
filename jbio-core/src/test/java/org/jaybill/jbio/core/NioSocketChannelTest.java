@@ -200,8 +200,6 @@ public class NioSocketChannelTest {
         var len = msg.getBytes(StandardCharsets.UTF_8).length;
         int loop = 2;
         var socketChannelConfig = NioSocketChannelConfigTemplate.DEFAULT;
-//        socketChannelConfig.getOptions().put(SocketOption.SO_REUSEADDR, true);
-//        socketChannelConfig.getOptions().put(SocketOption.SO_REUSE_PORT, true);
         // reset high & low watermark
         socketChannelConfig.setHighWatermark(len * loop);
         socketChannelConfig.setLowWatermark(len);
@@ -293,6 +291,9 @@ public class NioSocketChannelTest {
         Assert.assertEquals(7, closedFuture.get(5, TimeUnit.SECONDS).intValue());
     }
 
+    /**
+     * send buffer is full
+     */
     @Test
     public void test_sendBufferFull() throws IOException, ExecutionException, InterruptedException, TimeoutException {
         var msg = "hello world, I am very happy!";
@@ -316,8 +317,6 @@ public class NioSocketChannelTest {
 
         var socketChannelConfig = NioSocketChannelConfigTemplate.DEFAULT;
         socketChannelConfig.getOptions().put(SocketOption.SO_SNDBUF, 1); // set TCP send buffer
-//        socketChannelConfig.getOptions().put(SocketOption.SO_REUSEADDR, true);
-//        socketChannelConfig.getOptions().put(SocketOption.SO_REUSE_PORT, true);
         socketChannelConfig.setSpinCount(0); // disable spin write
 
         var server = JBIOServer.newInstance()
