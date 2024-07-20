@@ -7,4 +7,8 @@ public interface ChannelHandlerContext extends ChannelHandlerInvoker {
     ChannelHandler handler();
 
     EventLoop eventloop();
+
+    void attr(String k, Object v);
+
+    Object attr(String k);
 }

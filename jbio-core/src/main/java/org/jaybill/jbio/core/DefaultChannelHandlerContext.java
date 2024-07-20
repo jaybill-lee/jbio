@@ -1,11 +1,15 @@
 package org.jaybill.jbio.core;
 
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
 
 public class DefaultChannelHandlerContext implements ChannelHandlerContext {
     private final ChannelHandler handler;
     private final NioChannel channel;
     private final EventLoop eventLoop;
+    private final Map<String, Object> attrMap;
+
     DefaultChannelHandlerContext next;
     DefaultChannelHandlerContext prev;
 
@@ -13,6 +17,7 @@ public class DefaultChannelHandlerContext implements ChannelHandlerContext {
         this.handler = handler;
         this.channel = channel;
         this.eventLoop = eventLoop;
+        this.attrMap = new ConcurrentHashMap<>();
     }
 
     @Override
@@ -28,6 +33,16 @@ public class DefaultChannelHandlerContext implements ChannelHandlerContext {
     @Override
     public EventLoop eventloop() {
         return eventLoop;
+    }
+
+    @Override
+    public void attr(String k, Object v) {
+        attrMap.put(k, v);
+    }
+
+    @Override
+    public Object attr(String k) {
+        return attrMap.get(k);
     }
 
     @Override
