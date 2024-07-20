@@ -12,7 +12,6 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
 
 @Slf4j
 public class NioServerSocketChannel extends AbstractNioChannel implements NioChannel {
@@ -231,8 +230,8 @@ public class NioServerSocketChannel extends AbstractNioChannel implements NioCha
                 return;
             }
 
-            var childCh = new NioSocketChannel(ch, workerGroup.next(), workerConfigTemplate.create(),
-                    workerInitializer, null, null, NioSocketChannel.ACCEPT_MODE);
+            var childCh = NioSocketChannel.newAcceptModeInstance(
+                    provider, ch, workerGroup.next(), workerConfigTemplate.create(), workerInitializer);
             childCh.open();
         }
 

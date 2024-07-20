@@ -11,6 +11,7 @@ import java.nio.channels.CancelledKeyException;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
+import java.nio.channels.spi.SelectorProvider;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -20,16 +21,19 @@ public class NioSocketChannel extends AbstractNioChannel implements NioChannel  
     public static final int CONNECT_MODE = 0;
     public static final int ACCEPT_MODE = 1;
 
+    // connect mode params
+    private final Address localAddress;
+    private final Address remoteAddress;
+
     private final ChannelUnsafe unsafe;
-    private final SocketChannel socketChannel;
     private final NioSocketChannelConfig workerConfig;
     private final NioChannelInitializer initializer;
-    private final String host;
-    private final Integer port;
     private final int mode;
     private final NioEventLoop eventLoop;
     private final ChannelPipeline pipeline;
+    private final SelectorProvider provider;
 
+    private SocketChannel socketChannel;
     private SelectionKey selectionKey;
     private SendBuffer sendBuffer;
     private boolean channelUnWritable = false;
@@ -41,15 +45,34 @@ public class NioSocketChannel extends AbstractNioChannel implements NioChannel  
     private static final int ACTIVE = 2;
     private static final int CLOSED = -1;
 
-    public NioSocketChannel(SocketChannel socketChannel, NioEventLoop eventLoop, NioSocketChannelConfig workerConfig,
-                NioChannelInitializer initializer, String host, Integer port, int mode) {
+    public static NioSocketChannel newConnectModeInstance(
+            SelectorProvider provider, NioEventLoop eventLoop,
+            NioSocketChannelConfig workerConfig, NioChannelInitializer initializer,
+            Address localAddress, Address remoteAddress
+    ) {
+        return new NioSocketChannel(provider, null, eventLoop, workerConfig, initializer,
+                localAddress, remoteAddress, CONNECT_MODE);
+    }
+
+    public static NioSocketChannel newAcceptModeInstance(
+            SelectorProvider provider, SocketChannel socketChannel, NioEventLoop eventLoop,
+            NioSocketChannelConfig workerConfig, NioChannelInitializer initializer
+    ) {
+        return new NioSocketChannel(provider, socketChannel, eventLoop, workerConfig, initializer,
+                null, null, ACCEPT_MODE);
+    }
+
+    private NioSocketChannel(SelectorProvider provider, SocketChannel socketChannel, NioEventLoop eventLoop,
+                             NioSocketChannelConfig workerConfig,
+                             NioChannelInitializer initializer, Address localAddress, Address remoteAddress, int mode) {
         super();
+        this.provider = provider;
         this.unsafe = new ChannelUnsafe();
         this.socketChannel = socketChannel;
         this.workerConfig = workerConfig;
         this.initializer = initializer;
-        this.host = host;
-        this.port = port;
+        this.localAddress = localAddress;
+        this.remoteAddress = remoteAddress;
         this.mode = mode;
         this.eventLoop = eventLoop;
         this.pipeline = new DefaultChannelPipeline(new HeadHandler(), new TailHandler(), this, eventLoop);
@@ -146,6 +169,14 @@ public class NioSocketChannel extends AbstractNioChannel implements NioChannel  
     private final class ChannelUnsafe implements SocketUnsafe {
         @Override
         public void init() {
+            if (mode == CONNECT_MODE) {
+                try {
+                    socketChannel = provider.openSocketChannel();
+                } catch (IOException e) {
+                    throw new JBIOException("create jdk SocketChannel exception", e);
+                }
+            }
+
             // set non-blocking mode
             try {
                 socketChannel.configureBlocking(false);
@@ -179,27 +210,52 @@ public class NioSocketChannel extends AbstractNioChannel implements NioChannel  
 
         @Override
         public void bind() {
-            if (host != null && port != null) {
+            if (localAddress != null) {
                 try {
-                    socketChannel.bind(new InetSocketAddress(host, port));
-                    pipeline.fireChannelBound();
+                    socketChannel.bind(new InetSocketAddress(localAddress.getHost(), localAddress.getPort()));
                 } catch (IOException e) {
                     ChannelUtil.forceClose(socketChannel);
                     throw new JBIOException("SocketChannel bind error", e);
                 }
             }
+
+            if (mode == CONNECT_MODE) {
+                try {
+                    boolean finish = socketChannel.connect(new InetSocketAddress(
+                            remoteAddress.getHost(), remoteAddress.getPort()));
+                    if (finish) {
+                        socketChannel.finishConnect();
+                    }
+                } catch (IOException e) {
+                    ChannelUtil.forceClose(socketChannel);
+                    throw new JBIOException("SocketChannel connect error", e);
+                }
+            }
+
+            pipeline.fireChannelBound();
         }
 
         @Override
         public void register() {
             try {
                 selectionKey = socketChannel.register(eventLoop.selector(), 0, NioSocketChannel.this);
-                if (mode == CONNECT_MODE) {
-                    selectionKey.interestOps(SelectionKey.OP_CONNECT);
-                } else if (mode == ACCEPT_MODE) {
-                    selectionKey.interestOps(SelectionKey.OP_READ);
+                switch (mode) {
+                    case CONNECT_MODE -> {
+                        if (socketChannel.isConnected()) {
+                            // interest read event
+                            selectionKey.interestOps(SelectionKey.OP_READ);
+                            pipeline.fireChannelRegistered();
+                            pipeline.fireChannelConnected();
+                        } else {
+                            selectionKey.interestOps(SelectionKey.OP_CONNECT);
+                            pipeline.fireChannelRegistered();
+                        }
+                    }
+                    case ACCEPT_MODE -> {
+                        selectionKey.interestOps(SelectionKey.OP_READ);
+                        pipeline.fireChannelRegistered();
+                    }
                 }
-                pipeline.fireChannelRegistered();
             } catch (ClosedChannelException e) {
                 ChannelUtil.forceClose(socketChannel);
                 throw new JBIOException("SocketChannel register to Selector error", e);
@@ -237,6 +293,8 @@ public class NioSocketChannel extends AbstractNioChannel implements NioChannel  
             if ((readyOps & SelectionKey.OP_CONNECT) != 0) {
                 try {
                     socketChannel.finishConnect();
+                    selectionKey.interestOps(SelectionKey.OP_READ);
+                    pipeline.fireChannelConnected();
                 } catch (IOException e) {
                     pipeline.fireChannelException(e);
                     ChannelUtil.forceClose(socketChannel);
