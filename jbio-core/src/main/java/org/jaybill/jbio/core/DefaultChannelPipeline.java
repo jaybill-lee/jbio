@@ -62,76 +62,121 @@ public class DefaultChannelPipeline implements ChannelPipeline {
 
     @Override
     public void fireChannelInitialized() {
-        ((ChannelInboundHandler) head.handler()).channelInitialized(head);
+        eventLoop.submitTask(() -> {
+            ((ChannelInboundHandler) head.handler()).channelInitialized(head);
+            return null;
+        });
     }
 
     @Override
     public void fireChannelBound() {
-        ((ChannelInboundHandler) head.handler()).channelBound(head);
+        eventLoop.submitTask(() -> {
+            ((ChannelInboundHandler) head.handler()).channelBound(head);
+            return null;
+        });
     }
 
     @Override
     public void fireChannelRegistered() {
-        ((ChannelInboundHandler) head.handler()).channelRegistered(head);
+        eventLoop.submitTask(() -> {
+            ((ChannelInboundHandler) head.handler()).channelRegistered(head);
+            return null;
+        });
     }
 
     @Override
     public void fireChannelConnected() {
-        ((ChannelInboundHandler) head.handler()).channelConnected(head);
+        eventLoop.submitTask(() -> {
+            ((ChannelInboundHandler) head.handler()).channelConnected(head);
+            return null;
+        });
     }
 
     @Override
     public void fireChannelRead(Object o) {
-        ((ChannelInboundHandler) head.handler()).channelRead(head, o);
+        eventLoop.submitTask(() -> {
+            ((ChannelInboundHandler) head.handler()).channelRead(head, o);
+            return null;
+        });
     }
 
     @Override
     public void fireChannelClosed() {
-        ((ChannelInboundHandler) head.handler()).channelClosed(head);
+        eventLoop.submitTask(() -> {
+            ((ChannelInboundHandler) head.handler()).channelClosed(head);
+            return null;
+        });
     }
 
     @Override
     public void fireChannelDeregistered() {
-        ((ChannelInboundHandler) head.handler()).channelDeregistered(head);
+        eventLoop.submitTask(() -> {
+            ((ChannelInboundHandler) head.handler()).channelDeregistered(head);
+            return null;
+        });
     }
 
     @Override
     public void fireChannelException(Throwable t) {
-        ((ChannelInboundHandler) head.handler()).channelException(head, t);
+        eventLoop.submitTask(() -> {
+            ((ChannelInboundHandler) head.handler()).channelException(head, t);
+            return null;
+        });
     }
 
     @Override
     public void fireChannelUnWritable() {
-        ((ChannelInboundHandler) head.handler()).channelUnWritable(head);
+        eventLoop.submitTask(() -> {
+            ((ChannelInboundHandler) head.handler()).channelUnWritable(head);
+            return null;
+        });
     }
 
     @Override
     public void fireChannelWritable() {
-        ((ChannelInboundHandler) head.handler()).channelWritable(head);
+        eventLoop.submitTask(() -> {
+            ((ChannelInboundHandler) head.handler()).channelWritable(head);
+            return null;
+        });
     }
 
     @Override
     public void fireChannelSendBufferFull() {
-        ((ChannelInboundHandler) head.handler()).channelSendBufferFull(head);
+        eventLoop.submitTask(() -> {
+            ((ChannelInboundHandler) head.handler()).channelSendBufferFull(head);
+            return null;
+        });
     }
 
     @Override
     public void fireChannelClose() {
-        ((ChannelOutboundHandler) tail.handler()).close(tail);
+        eventLoop.submitTask(() -> {
+            ((ChannelOutboundHandler) tail.handler()).close(tail);
+            return null;
+        });
     }
 
     @Override
     public void fireChannelWrite(Object buf) {
-        ((ChannelOutboundHandler) tail.handler()).write(tail, buf);
+        eventLoop.submitTask(() -> {
+            ((ChannelOutboundHandler) tail.handler()).write(tail, buf);
+            return null;
+        });
     }
 
     @Override
     public void fireChannelFlush() {
-        ((ChannelOutboundHandler) tail.handler()).flush(tail);
+        eventLoop.submitTask(() -> {
+            ((ChannelOutboundHandler) tail.handler()).flush(tail);
+            return null;
+        });
     }
 
     @Override
     public void fireChannelWriteAndFlush(Object buf) {
-        ((ChannelOutboundHandler) tail.handler()).writeAndFlush(tail, buf);
+        eventLoop.submitTask(() -> {
+            ((ChannelOutboundHandler) tail.handler()).writeAndFlush(tail, buf);
+            return null;
+        });
     }
 }
