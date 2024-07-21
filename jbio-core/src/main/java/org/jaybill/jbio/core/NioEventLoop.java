@@ -82,6 +82,8 @@ public class NioEventLoop implements EventLoop, Runnable {
     public CompletableFuture<?> scheduleTask(Runnable r, int delay, TimeUnit unit) {
         var future = new CompletableFuture<>();
         delayTaskQueue.offer(new DelayTask<>(r, System.nanoTime() + unit.toNanos(delay), future));
+        // We must wake up the selector, in case of the selector is blocking in select() method.
+        selector.wakeup();
         return future;
     }
 
