@@ -407,6 +407,8 @@ public class NioSocketChannel extends AbstractNioChannel implements NioChannel  
                     }
                 } catch (IOException e) {
                     this.close();
+                } catch (Throwable e) {
+                    pipeline.fireChannelException(e);
                 }
             }
         }
