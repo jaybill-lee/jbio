@@ -111,7 +111,7 @@ public class DefaultChannelPipeline implements ChannelPipeline {
     }
 
     @Override
-    public void fireSendChannelFull() {
+    public void fireChannelSendBufferFull() {
         ((ChannelInboundHandler) head.handler()).channelSendBufferFull(head);
     }
 

@@ -384,7 +384,7 @@ public class NioSocketChannel extends AbstractNioChannel implements NioChannel  
                         if (!drainAll) {
                             log.warn("TCP send buffer is full, wait util next event loop, address:{}",
                                     socketChannel.getRemoteAddress());
-                            pipeline.fireSendChannelFull();
+                            pipeline.fireChannelSendBufferFull();
                             // return to SendBuffer instance
                             for (int i = pair.right() - 1; i >= pair.left(); i--) {
                                 sendBuffer.addFirst(waitForSendBufArray[i]);

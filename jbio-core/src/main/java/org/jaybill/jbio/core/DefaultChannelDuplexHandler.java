@@ -29,7 +29,7 @@ public class DefaultChannelDuplexHandler implements ChannelInboundHandler, Chann
 
     @Override
     public void channelSendBufferFull(ChannelHandlerContext ctx) {
-        ctx.fireSendChannelFull();
+        ctx.fireChannelSendBufferFull();
     }
 
     @Override

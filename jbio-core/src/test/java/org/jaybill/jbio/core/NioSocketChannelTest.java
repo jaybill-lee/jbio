@@ -47,7 +47,7 @@ public class NioSocketChannelTest {
 
             @Override
             public void channelSendBufferFull(ChannelHandlerContext ctx) {
-                ctx.fireSendChannelFull();
+                ctx.fireChannelSendBufferFull();
             }
 
             @Override
@@ -316,7 +316,7 @@ public class NioSocketChannelTest {
             @Override
             public void channelSendBufferFull(ChannelHandlerContext ctx) {
                 fullFuture.complete(true);
-                ctx.fireSendChannelFull();
+                ctx.fireChannelSendBufferFull();
             }
         };
 
