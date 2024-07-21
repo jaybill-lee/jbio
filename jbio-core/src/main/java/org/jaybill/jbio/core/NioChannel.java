@@ -1,5 +1,6 @@
 package org.jaybill.jbio.core;
 
+import java.net.InetSocketAddress;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
@@ -28,6 +29,11 @@ public interface NioChannel {
     <T> boolean option(SocketOption<T> option, T v);
 
     ChannelPipeline pipeline();
+
+
+    InetSocketAddress localAddress();
+
+    InetSocketAddress remoteAddress();
 
     CompletableFuture<? extends NioChannel> open();
 }

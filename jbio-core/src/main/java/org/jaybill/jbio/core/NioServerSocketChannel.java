@@ -101,6 +101,20 @@ public class NioServerSocketChannel extends AbstractNioChannel implements NioCha
     }
 
     @Override
+    public InetSocketAddress localAddress() {
+        try {
+            return (InetSocketAddress) serverSocketChannel.getLocalAddress();
+        } catch (IOException e) {
+            throw new JBIOException("local address error");
+        }
+    }
+
+    @Override
+    public InetSocketAddress remoteAddress() {
+        return null;
+    }
+
+    @Override
     public ByteBufferAllocator allocator() {
        throw new IllegalStateException("not support");
     }

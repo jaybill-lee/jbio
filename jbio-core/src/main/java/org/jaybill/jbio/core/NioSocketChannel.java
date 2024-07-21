@@ -125,6 +125,24 @@ public class NioSocketChannel extends AbstractNioChannel implements NioChannel  
     }
 
     @Override
+    public InetSocketAddress localAddress() {
+        try {
+            return (InetSocketAddress) socketChannel.getLocalAddress();
+        } catch (IOException e) {
+            throw new JBIOException("local address error");
+        }
+    }
+
+    @Override
+    public InetSocketAddress remoteAddress() {
+        try {
+            return (InetSocketAddress) socketChannel.getRemoteAddress();
+        } catch (IOException e) {
+            throw new JBIOException("remote address error");
+        }
+    }
+
+    @Override
     public ByteBufferAllocator allocator() {
         return workerConfig.getAllocator();
     }
