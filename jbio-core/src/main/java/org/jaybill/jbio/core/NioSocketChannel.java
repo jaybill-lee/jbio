@@ -96,11 +96,6 @@ public class NioSocketChannel extends AbstractNioChannel implements NioChannel  
     }
 
     @Override
-    void userEvent(UserEvent event) {
-
-    }
-
-    @Override
     public CompletableFuture<NioSocketChannel> open() {
         if (!state.compareAndSet(INIT, ACTIVING)) {
             while (stateFuture == null) {

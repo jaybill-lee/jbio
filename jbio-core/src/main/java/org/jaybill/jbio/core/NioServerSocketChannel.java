@@ -73,11 +73,6 @@ public class NioServerSocketChannel extends AbstractNioChannel implements NioCha
     }
 
     @Override
-    void userEvent(UserEvent event) {
-
-    }
-
-    @Override
     public CompletableFuture<NioServerSocketChannel> open() {
         if (!state.compareAndSet(INIT, ACTIVING)) {
             while (stateFuture == null) {
