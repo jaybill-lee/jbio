@@ -120,6 +120,11 @@ public class NioSocketChannel extends AbstractNioChannel implements NioChannel  
     }
 
     @Override
+    public void close() {
+        unsafe.close();
+    }
+
+    @Override
     public InetSocketAddress localAddress() {
         try {
             return (InetSocketAddress) socketChannel.getLocalAddress();

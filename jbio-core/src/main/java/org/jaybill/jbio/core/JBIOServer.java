@@ -55,4 +55,11 @@ public class JBIOServer {
                 bossInitializer, workerInitializer, workerGroup, host, port, backlog);
         return serverSocketChannel.open();
     }
+
+    public void closeAll() {
+        // first, close NioServerSocketChannels
+        bossGroup.close();
+        // then, close NioSocketChannels
+        workerGroup.close();
+    }
 }

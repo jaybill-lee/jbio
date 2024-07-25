@@ -13,15 +13,23 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
 
 @Slf4j
 public class NioEventLoop implements EventLoop, Runnable {
 
     private static final AtomicInteger COUNTER = new AtomicInteger(0);
 
-    private final AtomicBoolean started;
+    private static final int INIT = 0;
+    private static final int STARTED = 1;
+    private static final int CLOSING = 2;
+    private static final int CLOSED = 3;
+    private static final AtomicIntegerFieldUpdater<NioEventLoop> stateUpdater = AtomicIntegerFieldUpdater.newUpdater(
+            NioEventLoop.class, "state");
+    private int state = INIT;
+    private CompletableFuture<Void> closedFuture = new CompletableFuture<>();
+
     private Thread thread;
     private PriorityBlockingQueue<DelayTask<?>> delayTaskQueue;
     private Queue<Runnable> taskQueue;
@@ -30,7 +38,6 @@ public class NioEventLoop implements EventLoop, Runnable {
 
     public NioEventLoop(SelectorProvider provider, String namePrefix) {
         this.provider = provider;
-        this.started = new AtomicBoolean(false);
         this.thread = new Thread(this, namePrefix + COUNTER.getAndAdd(1));
         this.taskQueue = new MpscArrayQueue<>(16);
         this.delayTaskQueue = new PriorityBlockingQueue<>();
@@ -65,7 +72,7 @@ public class NioEventLoop implements EventLoop, Runnable {
         if (this.inEventLoop()) {
             wrapperRunnable.run();
         } else {
-            if (!started.compareAndExchange(false, true)) {
+            if (stateUpdater.compareAndSet(this, INIT, STARTED)) {
                 this.thread.start();
             }
             boolean added = taskQueue.offer(wrapperRunnable);
@@ -88,8 +95,19 @@ public class NioEventLoop implements EventLoop, Runnable {
     }
 
     @Override
-    public void close() {
-
+    public CompletableFuture<Void> close() {
+        var future = new CompletableFuture<Void>();
+        this.submitTask(() -> {
+            state = CLOSING;
+            closedFuture.whenComplete((r, t) -> {
+                if (t != null) {
+                    log.error("eventloop close error:", t);
+                }
+                future.complete(r);
+            });
+            return null;
+        });
+        return future;
     }
 
     @Override
@@ -149,7 +167,57 @@ public class NioEventLoop implements EventLoop, Runnable {
             } catch (Throwable e) {
                 log.error("eventloop occur error:", e);
             } finally {
-                // do some check
+                // shutdown gratefully
+                if (state == CLOSING) {
+                    try {
+                        // Using `selectNow()` clears the effect of a `wakeup()` call by another thread,
+                        // causing the selector to wake up directly in subsequent `select()` calls.
+                        selector.selectNow();
+                    } catch (Throwable e) {
+                        log.error("selectNow() error:", e);
+                    }
+
+                    // 0. close all channel
+                    selector.keys().forEach(k -> {
+                        try {
+                            ((NioChannel)(k.attachment())).close();
+                        } catch (Throwable e) {
+                            log.error("close channel error:", e);
+                        }
+                    });
+
+                    // 1. try to finish all real-time tasks
+                    Runnable r;
+                    while ((r = taskQueue.poll()) != null) {
+                        try {
+                            r.run();
+                        } catch (Throwable e) {
+                            log.error("run task error:", e);
+                        }
+                    }
+
+                    // 2. cancel all delay task
+                    DelayTask<?> task;
+                    while ((task = delayTaskQueue.poll()) != null) {
+                        try {
+                            task.future.cancel(true);
+                        } catch (Throwable e) {
+                            log.error("cancel task error:", e);
+                        }
+                    }
+
+                    // 3. close selector
+                    try {
+                        selector.close();
+                    } catch (Throwable e) {
+                        log.error("selector close error:", e);
+                    }
+
+                    // 4. notify
+                    state = CLOSED;
+                    closedFuture.complete(null);
+                    break;
+                }
             }
         }
     }

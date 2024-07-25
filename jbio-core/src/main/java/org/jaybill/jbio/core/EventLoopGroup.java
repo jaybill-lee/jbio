@@ -1,7 +1,9 @@
 package org.jaybill.jbio.core;
 
+import java.util.concurrent.CompletableFuture;
+
 public interface EventLoopGroup {
     EventLoop next();
 
-    void close();
+    CompletableFuture<Void> close();
 }

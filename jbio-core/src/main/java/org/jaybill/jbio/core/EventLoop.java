@@ -31,5 +31,5 @@ public interface EventLoop {
     /**
      * close eventloop
      */
-    void close();
+    CompletableFuture<Void> close();
 }

@@ -96,6 +96,11 @@ public class NioServerSocketChannel extends AbstractNioChannel implements NioCha
     }
 
     @Override
+    public void close() {
+        unsafe.close();
+    }
+
+    @Override
     public InetSocketAddress localAddress() {
         try {
             return (InetSocketAddress) serverSocketChannel.getLocalAddress();

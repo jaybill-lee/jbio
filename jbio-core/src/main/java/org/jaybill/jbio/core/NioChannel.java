@@ -36,4 +36,6 @@ public interface NioChannel {
     InetSocketAddress remoteAddress();
 
     CompletableFuture<? extends NioChannel> open();
+
+    void close();
 }
